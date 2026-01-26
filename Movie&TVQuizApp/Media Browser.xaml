@@ -1,0 +1,508 @@
+﻿<Window x:Class="Movie_AnimeQuizApp.MediaBrowser"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Movie_AnimeQuizApp"
+        Title="Media Browser"
+        WindowState="Maximized"
+        Background="#101010"
+        PreviewMouseDown="Window_PreviewMouseDown">
+
+    <Window.Resources>
+
+        <!-- スクロールバー非表示（ホイールスクロールは有効） -->
+        <Style TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="0"/>
+            <Setter Property="Height" Value="0"/>
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="HeaderHitStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="MenuButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#FFFFFFFF"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Width" Value="160"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Margin" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+
+                            <Border x:Name="Accent"
+                                    Background="#E50914"
+                                    Height="5"
+                                    VerticalAlignment="Bottom"
+                                    Margin="6,0,6,4"
+                                    Opacity="0"
+                                    CornerRadius="2"/>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FFF0F0F0"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#E50914"/>
+                                <Setter TargetName="Accent" Property="Opacity" Value="1"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FFE6E6E6"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#E50914"/>
+                                <Setter TargetName="Accent" Property="Opacity" Value="1"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <local:CircularArcConverter x:Key="ArcConv"/>
+
+        <!-- 作品カード -->
+        <DataTemplate x:Key="BrowserItemTemplate">
+            <Grid Margin="6">
+
+                <!-- 通常カード -->
+                <Button x:Name="MediaBtn"
+                        Click="MediaCard_Click"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Top">
+                    <Border Background="#151515"
+                            BorderBrush="#2A2A2A"
+                            BorderThickness="1"
+                            CornerRadius="14"
+                            Height="470">
+                        <Grid ClipToBounds="False">
+
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="260"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- 画像 -->
+                                <Border Grid.Row="0"
+                                        CornerRadius="14,14,0,0"
+                                        ClipToBounds="True"
+                                        Background="Black">
+                                    <Image Stretch="UniformToFill"
+                                           Loaded="PosterImage_Loaded"
+                                           Tag="{Binding PosterUrl}"
+                                           RenderOptions.BitmapScalingMode="LowQuality"/>
+                                </Border>
+
+                                <!-- タイトル + 日付 -->
+                                <Border Grid.Row="1"
+                                        Background="#141414"
+                                        CornerRadius="0,0,14,14"
+                                        Padding="12,54,12,14">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}"
+                                                   Foreground="White"
+                                                   FontSize="21"
+                                                   FontWeight="Bold"
+                                                   TextWrapping="Wrap"/>
+
+                                        <TextBlock Text="{Binding AirDateText}"
+                                                   Foreground="#D0D0D0"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,10,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- 評価スコア -->
+                            <Canvas Panel.ZIndex="999"
+                                    ClipToBounds="False"
+                                    IsHitTestVisible="False">
+                                <Grid Width="46" Height="46"
+                                      Canvas.Left="12"
+                                      Canvas.Top="235">
+                                    <Ellipse Fill="#0B0B0B" Stroke="#2E2E2E" StrokeThickness="2"/>
+                                    <Ellipse Stroke="#2F2F2F" StrokeThickness="6" Fill="Transparent" Margin="5"/>
+
+                                    <Path Stroke="LimeGreen"
+                                          StrokeThickness="6"
+                                          Fill="Transparent"
+                                          Data="{Binding ScorePercent, Converter={StaticResource ArcConv}, ConverterParameter=46}"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round">
+                                        <Path.RenderTransform>
+                                            <RotateTransform Angle="-90" CenterX="23" CenterY="23"/>
+                                        </Path.RenderTransform>
+                                    </Path>
+
+                                    <TextBlock Text="{Binding ScoreText}"
+                                               Foreground="White"
+                                               FontSize="11"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </Canvas>
+
+                        </Grid>
+                    </Border>
+
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLoadMore}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- LoadMoreカード -->
+                <Button x:Name="LoadMoreBtn"
+                        Click="LoadMore_Click"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Top">
+                    <Border Background="#151515"
+                            BorderBrush="#2A2A2A"
+                            BorderThickness="1"
+                            CornerRadius="14"
+                            Height="470">
+                        <Grid>
+                            <TextBlock Text="さらに読み込む"
+                                       Foreground="White"
+                                       FontSize="22"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLoadMore}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+            </Grid>
+        </DataTemplate>
+
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="60"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ヘッダー行 -->
+        <Border Grid.Row="0" Background="#AA000000" Height="60">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition/>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="80"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 映画 -->
+                <Border Grid.Column="0"
+                        Style="{StaticResource HeaderHitStyle}"
+                        MouseEnter="MovieHeader_MouseEnter"
+                        MouseLeave="MovieHeader_MouseLeave">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="映画" Foreground="White" FontSize="24"/>
+                        <TextBlock Text=" ▾" Foreground="#E50914" FontSize="22" Margin="6,0,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- テレビ番組 -->
+                <Border Grid.Column="1"
+                        Style="{StaticResource HeaderHitStyle}"
+                        MouseEnter="TvHeader_MouseEnter"
+                        MouseLeave="TvHeader_MouseLeave">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="テレビ番組" Foreground="White" FontSize="24"/>
+                        <TextBlock Text=" ▾" Foreground="#E50914" FontSize="22" Margin="6,0,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- クイズ（MainWindowと同じ：ホバーでメニュー） -->
+                <Border Grid.Column="2"
+                        Style="{StaticResource HeaderHitStyle}"
+                        MouseEnter="QuizHeader_MouseEnter"
+                        MouseLeave="QuizHeader_MouseLeave">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="クイズ" Foreground="White" FontSize="24"/>
+                        <TextBlock Text=" ▾" Foreground="#E50914" FontSize="22" Margin="6,0,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Home -->
+                <Button Grid.Column="3"
+                        Click="Home_Click"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="44"
+                        Height="44"
+                        Content="🏠"
+                        FontSize="22"
+                        Foreground="White"/>
+            </Grid>
+        </Border>
+
+        <!-- ホバーで出すメニュー -->
+        <Grid Grid.Row="1" Background="Transparent" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="80"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 映画 -->
+            <Border x:Name="MovieMenu"
+                    Grid.Column="0"
+                    Visibility="Collapsed"
+                    Background="Transparent"
+                    HorizontalAlignment="Center"
+                    MouseEnter="Menu_MouseEnter"
+                    MouseLeave="Menu_MouseLeave">
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="人気" Click="MoviePopular_Click"/>
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="上映中" Click="MovieNowPlaying_Click"/>
+                </StackPanel>
+            </Border>
+
+            <!-- TV -->
+            <Border x:Name="TvMenu"
+                    Grid.Column="1"
+                    Visibility="Collapsed"
+                    Background="Transparent"
+                    HorizontalAlignment="Center"
+                    MouseEnter="Menu_MouseEnter"
+                    MouseLeave="Menu_MouseLeave">
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="人気" Click="TvPopular_Click"/>
+                    <Button Style="{StaticResource MenuButtonStyle}" Content="放送中" Click="TvOnAir_Click"/>
+                </StackPanel>
+            </Border>
+
+            <!-- クイズ（MainWindowと同じ構造） -->
+            <Border x:Name="QuizMenu"
+                    Grid.Column="2"
+                    Visibility="Collapsed"
+                    Background="Transparent"
+                    HorizontalAlignment="Center"
+                    MouseEnter="Menu_MouseEnter"
+                    MouseLeave="Menu_MouseLeave">
+                <StackPanel Orientation="Vertical">
+
+                    <!-- 上：クイズ回答/クイズ作成 -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="QuizSearchHit"
+                                Style="{StaticResource MenuButtonStyle}"
+                                Content="クイズ回答"
+                                Click="QuizSearchHit_Click"
+                                MouseEnter="QuizSearchHit_MouseEnter"
+                                MouseLeave="QuizSearchHit_MouseLeave"/>
+                        <Button Style="{StaticResource MenuButtonStyle}"
+                                Content="クイズを作成"
+                                Click="QuizCreate_Click"/>
+                    </StackPanel>
+
+                    <!-- 下：クイズ検索ボックス（TextBlockプレースホルダー） -->
+                    <Border x:Name="QuizSearchPanel"
+                            Visibility="Collapsed"
+                            Margin="10,10,10,0"
+                            Background="Transparent"
+                            MouseEnter="QuizSearchPanel_MouseEnter"
+                            MouseLeave="QuizSearchPanel_MouseLeave">
+                        <Border Background="#66000000"
+                                BorderBrush="#808080"
+                                BorderThickness="2"
+                                CornerRadius="10"
+                                Padding="10"
+                                Width="340">
+                            <Grid>
+                                <!-- 入力本体 -->
+                                <TextBox x:Name="QuizSearchTextBox"
+                                         FontSize="16"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Foreground="White"
+                                         VerticalContentAlignment="Center"
+                                         CaretBrush="White"
+                                         Cursor="IBeam"
+                                         GotFocus="QuizSearch_GotFocus"
+                                         LostFocus="QuizSearch_LostFocus"
+                                         PreviewKeyDown="QuizSearch_PreviewKeyDown"
+                                         PreviewMouseLeftButtonDown="QuizSearch_PreviewMouseLeftButtonDown"
+                                         TextChanged="QuizSearch_TextChanged"/>
+
+                                <!-- プレースホルダー：入力扱いにならない -->
+                                <TextBlock Text="クイズしたい作品名を入力"
+                                           Foreground="Gray"
+                                           FontSize="16"
+                                           Margin="2,0,0,0"
+                                           VerticalAlignment="Center"
+                                           IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=QuizSearchTextBox, Path=Text}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </Border>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- 見出し -->
+        <Border Grid.Row="2" Background="#0E0E0E" BorderBrush="#1E1E1E" BorderThickness="0,1,0,1">
+            <Grid Margin="16,10">
+                <TextBlock x:Name="CategoryText"
+                           Text="人気の映画"
+                           Foreground="White"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- ジャンル + 一覧 -->
+        <Grid Grid.Row="3" Margin="12,12,12,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ジャンル -->
+            <Border Grid.Row="0" Background="Transparent" Padding="0,0,0,10">
+                <ItemsControl ItemsSource="{Binding Genres}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <ToggleButton Click="Genre_Click"
+                                          Tag="{Binding Id}"
+                                          IsChecked="{Binding IsSelected}"
+                                          Width="92"
+                                          Height="34"
+                                          Margin="6"
+                                          Padding="0"
+                                          Cursor="Hand"
+                                          BorderThickness="2"
+                                          BorderBrush="#FFFFFF"
+                                          Background="White"
+                                          Foreground="Black"
+                                          FontWeight="Bold"
+                                          FontSize="14">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Bd"
+                                                CornerRadius="6"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}">
+                                            <ContentPresenter HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#2D7DFF"/>
+                                                <Setter Property="Foreground" Value="White"/>
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="#2D7DFF"/>
+                                            </Trigger>
+
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="#2D7DFF"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+
+                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                            </ToggleButton>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <!-- 一覧 -->
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="8"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <StaticResource ResourceKey="BrowserItemTemplate"/>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+        </Grid>
+    </Grid>
+</Window>

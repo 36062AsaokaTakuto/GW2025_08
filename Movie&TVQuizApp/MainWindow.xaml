@@ -1,0 +1,338 @@
+﻿<Window x:Class="Movie_AnimeQuizApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Movie Anime Quiz App"
+        WindowState="Maximized"
+        Background="Black"
+        PreviewMouseDown="Window_PreviewMouseDown">
+
+    <Window.Resources>
+
+        <Style x:Key="HeaderHitStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <!-- メニューボタン（横並び向け） -->
+        <Style x:Key="MenuButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#FFFFFFFF"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Width" Value="160"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Margin" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+
+                            <Border x:Name="Accent"
+                                    Background="#E50914"
+                                    Height="5"
+                                    VerticalAlignment="Bottom"
+                                    Margin="6,0,6,4"
+                                    Opacity="0"
+                                    CornerRadius="2"/>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FFF0F0F0"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#E50914"/>
+                                <Setter TargetName="Accent" Property="Opacity" Value="1"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FFE6E6E6"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#E50914"/>
+                                <Setter TargetName="Accent" Property="Opacity" Value="1"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid>
+        <!-- 背景 -->
+        <Canvas x:Name="BackgroundCanvas"/>
+
+        <!-- 前景 -->
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="60"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ヘッダー -->
+            <Border Grid.Row="0" Background="#AA000000" Height="60" VerticalAlignment="Top">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 映画 -->
+                    <Border Grid.Column="0"
+                            Style="{StaticResource HeaderHitStyle}"
+                            MouseEnter="MovieHeader_MouseEnter"
+                            MouseLeave="MovieHeader_MouseLeave">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="映画" Foreground="White" FontSize="24"/>
+                            <TextBlock Text=" ▾" Foreground="#E50914" FontSize="22" Margin="6,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- テレビ番組 -->
+                    <Border Grid.Column="1"
+                            Style="{StaticResource HeaderHitStyle}"
+                            MouseEnter="TvHeader_MouseEnter"
+                            MouseLeave="TvHeader_MouseLeave">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="テレビ番組" Foreground="White" FontSize="24"/>
+                            <TextBlock Text=" ▾" Foreground="#E50914" FontSize="22" Margin="6,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- クイズ -->
+                    <Border Grid.Column="2"
+                            Style="{StaticResource HeaderHitStyle}"
+                            MouseEnter="QuizHeader_MouseEnter"
+                            MouseLeave="QuizHeader_MouseLeave">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="クイズ" Foreground="White" FontSize="24"/>
+                            <TextBlock Text=" ▾" Foreground="#E50914" FontSize="22" Margin="6,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ホバーで出すメニュー -->
+            <Grid Grid.Row="1" Background="Transparent" Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition/>
+                    <ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 映画 -->
+                <Border x:Name="MovieMenu"
+                        Grid.Column="0"
+                        Visibility="Collapsed"
+                        Background="Transparent"
+                        HorizontalAlignment="Center"
+                        MouseEnter="Menu_MouseEnter"
+                        MouseLeave="Menu_MouseLeave">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource MenuButtonStyle}" Content="人気" Click="MoviePopular_Click"/>
+                        <Button Style="{StaticResource MenuButtonStyle}" Content="上映中" Click="MovieNowPlaying_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- TV -->
+                <Border x:Name="TvMenu"
+                        Grid.Column="1"
+                        Visibility="Collapsed"
+                        Background="Transparent"
+                        HorizontalAlignment="Center"
+                        MouseEnter="Menu_MouseEnter"
+                        MouseLeave="Menu_MouseLeave">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource MenuButtonStyle}" Content="人気" Click="TvPopular_Click"/>
+                        <Button Style="{StaticResource MenuButtonStyle}" Content="放送中" Click="TvOnAir_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- クイズ -->
+                <Border x:Name="QuizMenu"
+                        Grid.Column="2"
+                        Visibility="Collapsed"
+                        Background="Transparent"
+                        HorizontalAlignment="Center"
+                        MouseEnter="Menu_MouseEnter"
+                        MouseLeave="Menu_MouseLeave">
+                    <StackPanel Orientation="Vertical">
+
+                        <!-- 上：クイズ回答/クイズ作成 -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <!-- ここにホバーを当てる -->
+                            <Button x:Name="QuizSearchHit"
+                                    Style="{StaticResource MenuButtonStyle}"
+                                    Content="クイズ回答"
+                                    Click="QuizSearchHit_Click"
+                                    MouseEnter="QuizSearchHit_MouseEnter"
+                                    MouseLeave="QuizSearchHit_MouseLeave"/>
+                            <Button Style="{StaticResource MenuButtonStyle}"
+                                    Content="クイズを作成"
+                                    Click="QuizCreate_Click"/>
+                        </StackPanel>
+
+                        <!-- 下：クイズ検索ボックス（入力中は消えない） -->
+                        <Border x:Name="QuizSearchPanel"
+                                Visibility="Collapsed"
+                                Margin="10,10,10,0"
+                                Background="Transparent"
+                                MouseEnter="QuizSearchPanel_MouseEnter"
+                                MouseLeave="QuizSearchPanel_MouseLeave">
+                            <Border Background="#66000000"
+                                    BorderBrush="#808080"
+                                    BorderThickness="2"
+                                    CornerRadius="10"
+                                    Padding="10"
+                                    Width="340">
+
+                                <!-- ★TextBoxにプレースホルダー文字を入れず、上にTextBlockを重ねる -->
+                                <Grid>
+                                    <TextBox x:Name="QuizSearchTextBox"
+                                             FontSize="16"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Foreground="White"
+                                             VerticalContentAlignment="Center"
+                                             CaretBrush="White"
+                                             Cursor="IBeam"
+                                             GotFocus="QuizSearch_GotFocus"
+                                             LostFocus="QuizSearch_LostFocus"
+                                             PreviewKeyDown="QuizSearch_PreviewKeyDown"
+                                             PreviewMouseLeftButtonDown="QuizSearch_PreviewMouseLeftButtonDown"
+                                             TextChanged="QuizSearch_TextChanged"/>
+
+                                    <!-- ★未入力のときだけ表示するプレースホルダー -->
+                                    <TextBlock x:Name="QuizSearchWatermark"
+                                               Text="クイズしたい作品名を入力"
+                                               Foreground="Gray"
+                                               FontSize="16"
+                                               Margin="2,0,0,0"
+                                               VerticalAlignment="Center"
+                                               IsHitTestVisible="False"/>
+                                </Grid>
+
+                            </Border>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 検索バー + 候補 -->
+            <Grid Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 検索バー -->
+                    <Border Grid.Row="0"
+                            Background="#66000000"
+                            BorderBrush="#808080"
+                            BorderThickness="2"
+                            CornerRadius="25"
+                            Width="520"
+                            Height="52"
+                            Padding="6">
+                        <!-- MainWindow.xaml：中央の検索バー部分（検索ボタンを復活）※このGridを差し替え -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition/>
+                                <ColumnDefinition Width="90"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox x:Name="SearchTextBox"
+                                     Grid.Column="0"
+                                     FontSize="16"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Margin="16,0,10,0"
+                                     VerticalContentAlignment="Center"
+                                     Text="作品名を検索..."
+                                     Foreground="Gray"
+                                     GotFocus="SearchBox_GotFocus"
+                                     LostFocus="SearchBox_LostFocus"
+                                     TextChanged="SearchTextBox_TextChanged"
+                                     PreviewKeyDown="SearchTextBox_PreviewKeyDown"
+                                     PreviewMouseLeftButtonDown="SearchTextBox_PreviewMouseLeftButtonDown"/>
+
+                            <!-- ★消さない：検索ボタン -->
+                            <Button Grid.Column="1"
+                                    Content="検索"
+                                    FontSize="14"
+                                    Background="#E50914"
+                                    Foreground="White"
+                                    BorderThickness="0"
+                                    Click="Search_Click">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" CornerRadius="20">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+
+                    </Border>
+
+                    <!-- 候補（既存のまま使う） -->
+                    <Border x:Name="SuggestBorder"
+                            Grid.Row="1"
+                            Visibility="Collapsed"
+                            Margin="0,8,0,0"
+                            Width="520"
+                            Background="#DD111111"
+                            CornerRadius="10"
+                            BorderBrush="#2A2A2A"
+                            BorderThickness="1">
+                        <ListBox x:Name="SuggestList"
+                                 ItemsSource="{Binding Suggestions}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Foreground="White"
+                                 SelectionMode="Single"
+                                 MouseLeftButtonUp="SuggestList_MouseLeftButtonUp">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="50"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Width="46" Height="68" CornerRadius="6" ClipToBounds="True" Background="#222">
+                                            <Image Stretch="UniformToFill" Source="{Binding PosterThumbUrl}"/>
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                            <TextBlock Text="{Binding Title}" FontSize="14" Foreground="White" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Sub}" FontSize="12" Foreground="#BFBFBF" Margin="0,3,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

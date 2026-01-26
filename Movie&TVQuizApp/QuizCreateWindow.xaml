@@ -1,0 +1,269 @@
+﻿<!-- QuizCreateWindow.xaml（ラベル見やすく/QuestionTextBoxを下げて隙間詰め） -->
+<Window x:Class="Movie_AnimeQuizApp.Views.QuizCreateWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Quiz Create" Height="600" Width="1040"
+        WindowStartupLocation="CenterScreen"
+        Background="#0E0F12"
+        Foreground="#EDEDED"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+
+        <Style x:Key="FlatButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#20222A"/>
+            <Setter Property="Foreground" Value="#F3F3F3"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="16">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2A2D38"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3A3E4D"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="26"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#F4F4F4"/>
+        </Style>
+
+        <!-- ★ラベルを見やすく（サイズ↑、色↑、影少し） -->
+        <Style x:Key="LabelTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#EDEDED"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="6" ShadowDepth="0" Opacity="0.35"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#F3F3F3"/>
+            <Setter Property="CaretBrush" Value="#F3F3F3"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+
+        <Style x:Key="SmallFieldBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#8020222A"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="BorderBrush" Value="#2A2C34"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid>
+        <Image x:Name="BackdropImage" Stretch="UniformToFill" Opacity="0.95"/>
+        <Border Background="#220E0F12" Padding="8" CornerRadius="22">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="50"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="300"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="3.5*"/>
+                    <RowDefinition Height="1.25*"/>
+                </Grid.RowDefinitions>
+
+                
+
+                <!-- 上：作品名 -->
+                <TextBlock Grid.Column="1" Grid.Row="0"
+                           x:Name="WorkTitleText"
+                           Style="{StaticResource TitleTextStyle}"
+                           Text="未選択"
+                           FontSize="60"
+                           HorizontalAlignment="Center"
+                           Margin="0,50,8,4"/>
+
+                <!-- 右上：作品検索（ラベル見やすく） -->
+                <StackPanel Grid.Column="2" Grid.Row="0" Margin="0,20,0,4">
+                    <TextBlock Text="作品検索"
+                               Style="{StaticResource LabelTextStyle}"
+                               FontSize="20"
+                               HorizontalAlignment="Center"/>
+
+                    <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
+                        <TextBox x:Name="WorkSearchTextBox"
+                                 Style="{StaticResource DarkTextBoxStyle}"
+                                 Foreground="Gray"
+                                 Text="クイズを作りたい作品を検索"
+                                 FontSize="20"
+                                 GotFocus="WorkSearch_GotFocus"
+                                 LostFocus="WorkSearch_LostFocus"
+                                 PreviewKeyDown="WorkSearchTextBox_PreviewKeyDown"/>
+                    </Border>
+
+                    <Popup x:Name="WorkSuggestPopup"
+                           PlacementTarget="{Binding ElementName=WorkSearchTextBox}"
+                           Placement="Bottom"
+                           StaysOpen="False"
+                           AllowsTransparency="True">
+                        <Border Background="#DD111111"
+                                CornerRadius="10"
+                                BorderBrush="#2A2A2A"
+                                BorderThickness="1"
+                                Width="420"
+                                Margin="0,6,0,0">
+                            <ListBox x:Name="WorkSuggestList"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="White"
+                                     SelectionMode="Single"
+                                     MouseLeftButtonUp="WorkSuggestList_MouseLeftButtonUp"
+                                     PreviewKeyDown="WorkSuggestList_PreviewKeyDown">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="10,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="50"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Width="46" Height="68" CornerRadius="6" ClipToBounds="True" Background="#222">
+                                                <Image Stretch="UniformToFill" Source="{Binding PosterThumbUrl}"/>
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                                <TextBlock Text="{Binding Title}" FontSize="14" Foreground="White" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Sub}" FontSize="12" Foreground="#BFBFBF" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+                    </Popup>
+                </StackPanel>
+
+                <!-- 中：問題文（TextBoxを下げて隙間詰め） -->
+                <StackPanel Grid.Column="1" Grid.Row="1" Margin="0,0,8,0">
+                    <TextBlock Text="問題文"
+                               Style="{StaticResource LabelTextStyle}"
+                               HorizontalAlignment="Center"
+                               FontSize="40"
+                               Margin="0,100,0,10"/>
+                    <!-- ★ここで下げる：上マージンを増やす -->
+                    <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0,80,0,0">
+                        <TextBox x:Name="QuestionTextBox"
+                             Style="{StaticResource DarkTextBoxStyle}"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Text="問題文を入力してください。"
+                             Foreground="Gray"
+                             VerticalScrollBarVisibility="Auto"
+                             FontSize="25"
+                             Height="275"
+                             GotFocus="Question_GotFocus"
+                             LostFocus="Question_LostFocus"/>
+                    </Border>
+                </StackPanel>
+
+                <!-- 右：設定（作成者ラベル見やすく、他は背景） -->
+                <StackPanel Grid.Column="2" Grid.Row="1">
+                    <TextBlock Text="作成者"
+                               Style="{StaticResource LabelTextStyle}"
+                               Margin="0,20,0,10"
+                               FontSize="20"
+                               HorizontalAlignment="Center"/>
+
+                    <Border Style="{StaticResource SmallFieldBorderStyle}">
+                        <TextBox x:Name="CreatedByTextBox"
+                                 Style="{StaticResource DarkTextBoxStyle}"
+                                 FontSize="20"/>
+                    </Border>
+
+                    <TextBlock x:Name="HintText" Visibility="Collapsed"/>
+                </StackPanel>
+
+                <!-- 下：選択肢 -->
+                <Border Grid.Column="1" Grid.Row="2" Margin="0,8,8,0" Background="Transparent">
+                    <UniformGrid Rows="1" Columns="3">
+
+                        <Border Background="#B817181D" CornerRadius="16" BorderBrush="#2A2C34" BorderThickness="1" Padding="10" Margin="0,0,6,20">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <RadioButton x:Name="CorrectRadio1" Content="正解" GroupName="CorrectChoice"
+                                             Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
+                                <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
+                                    <TextBox x:Name="ChoiceTextBox1" Style="{StaticResource DarkTextBoxStyle}" FontSize="16"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border Background="#B817181D" CornerRadius="16" BorderBrush="#2A2C34" BorderThickness="1" Padding="10" Margin="0,0,6,20">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <RadioButton x:Name="CorrectRadio2" Content="正解" GroupName="CorrectChoice"
+                                             Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
+                                <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
+                                    <TextBox x:Name="ChoiceTextBox2" Style="{StaticResource DarkTextBoxStyle}" FontSize="16"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border Background="#B817181D" CornerRadius="16" BorderBrush="#2A2C34" BorderThickness="1" Padding="10" Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <RadioButton x:Name="CorrectRadio3" Content="正解" GroupName="CorrectChoice"
+                                             Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
+                                <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
+                                    <TextBox x:Name="ChoiceTextBox3" Style="{StaticResource DarkTextBoxStyle}" FontSize="16"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                    </UniformGrid>
+                </Border>
+
+                <!-- 右下：保存/キャンセル -->
+                <StackPanel Grid.Column="2" Grid.Row="2">
+                    <Button Content="保存" Height="70" Style="{StaticResource FlatButtonStyle}"
+                            Background="#E50914" Margin="0,10,0,0" Click="Save_Click"/>
+                    <Button Content="キャンセル" Height="70" Style="{StaticResource FlatButtonStyle}"
+                            Margin="0,40,0,0" Click="Cancel_Click"/>
+                </StackPanel>
+
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
