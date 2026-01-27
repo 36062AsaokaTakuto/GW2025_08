@@ -347,14 +347,20 @@
                     <!-- 上：クイズ回答/クイズ作成 -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button x:Name="QuizSearchHit"
-                                Style="{StaticResource MenuButtonStyle}"
-                                Content="クイズ回答"
-                                Click="QuizSearchHit_Click"
-                                MouseEnter="QuizSearchHit_MouseEnter"
-                                MouseLeave="QuizSearchHit_MouseLeave"/>
+                            Style="{StaticResource MenuButtonStyle}"
+                            Content="クイズ回答"
+                            Click="QuizSearchHit_Click"
+                            MouseEnter="QuizSearchHit_MouseEnter"
+                            MouseLeave="QuizSearchHit_MouseLeave"/>
+
                         <Button Style="{StaticResource MenuButtonStyle}"
-                                Content="クイズを作成"
-                                Click="QuizCreate_Click"/>
+                            Content="クイズを作成"
+                            Click="QuizCreate_Click"/>
+
+                        <!-- ★追加：クイズ削除 -->
+                        <Button Style="{StaticResource MenuButtonStyle}"
+                            Content="クイズ削除"
+                            Click="QuizDelete_Click"/>
                     </StackPanel>
 
                     <!-- 下：クイズ検索ボックス（TextBlockプレースホルダー） -->

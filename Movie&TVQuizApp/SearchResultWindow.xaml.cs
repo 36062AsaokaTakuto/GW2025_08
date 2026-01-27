@@ -299,6 +299,9 @@ namespace Movie_AnimeQuizApp {
             win.Owner = this;
             win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
+            // ★ここが重要：最大化（念のため Show 前後どっちでも効くように）
+            win.WindowState = WindowState.Maximized;
+
             if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
             if (QuizMenu != null) QuizMenu.Visibility = Visibility.Collapsed;
 
@@ -307,7 +310,9 @@ namespace Movie_AnimeQuizApp {
                 if (AppNav.ForceMain) return;
                 try { this.Show(); this.Activate(); } catch { }
             };
+
             win.Show();
+            win.WindowState = WindowState.Maximized; // ★保険
         }
 
         // クイズ作成（MainWindow/MediaBrowserと同じ）
@@ -315,6 +320,7 @@ namespace Movie_AnimeQuizApp {
             HideMenus();
 
             Window w = CreateWindowByTypeNames(new string[] {
+                "Movie_AnimeQuizApp.Views.QuizCreateWindow",
                 "Movie_AnimeQuizApp.QuizCreateWindow",
                 "Movie_AnimeQuizApp.QuizCreate",
                 "Movie_AnimeQuizApp.QuizCreatePage"
@@ -936,6 +942,27 @@ namespace Movie_AnimeQuizApp {
             catch {
                 target.Source = null;
             }
+        }
+
+        private void QuizDelete_Click(object sender, RoutedEventArgs e) {
+            HideMenus();
+
+            Window w = CreateWindowByTypeNames(new string[] {
+                "Movie_AnimeQuizApp.Views.QuizDeleteWindow",
+                "Movie_AnimeQuizApp.QuizDeleteWindow",
+                "Movie_AnimeQuizApp.QuizDelete"
+            });
+
+            if (w == null) {
+                MessageBox.Show("クイズ削除画面（QuizDeleteWindow）が見つかりません。");
+                return;
+            }
+
+            w.Owner = this;
+            w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            // ★この画面は消さない
+            w.ShowDialog();
         }
     }
 }

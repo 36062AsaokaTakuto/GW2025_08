@@ -18,6 +18,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
+using Movie_AnimeQuizApp.Views;
 
 
 namespace Movie_AnimeQuizApp {
@@ -1105,6 +1106,15 @@ namespace Movie_AnimeQuizApp {
                 if (token.IsCancellationRequested) return;
                 for (int i = 0; i < targets.Count; i++) targets[i].Source = bmp;
             });
+        }
+
+        private void QuizDelete_Click(object sender, RoutedEventArgs e) {
+            HideMenus();
+            HideSuggest();
+
+            var w = new QuizDeleteWindow();
+            w.Owner = this;
+            w.ShowDialog();
         }
     }
 }

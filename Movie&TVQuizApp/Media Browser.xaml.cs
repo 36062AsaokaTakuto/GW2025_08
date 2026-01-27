@@ -342,6 +342,7 @@ namespace Movie_AnimeQuizApp {
 
         // ★XAMLが呼んでるので必須（クイズ開始ボタン）
         private async void QuizSearchHit_Click(object sender, RoutedEventArgs e) {
+            // まずUI（パネル表示＆フォーカス）
             if (QuizSearchPanel != null && QuizSearchPanel.Visibility != Visibility.Visible) {
                 ShowQuizSearchPanel();
             }
@@ -350,8 +351,48 @@ namespace Movie_AnimeQuizApp {
                 QuizSearchTextBox.Focus();
             }
 
-            await TryStartQuizAsync();
+            // 入力欄の文字（空なら何もしない）
+            string title = (QuizSearchTextBox?.Text ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(title)) return;
+
+            await AppDb.InitAsync();
+
+            // ★完全一致で検索
+            Work work = await AppDb.Connection.Table<Work>()
+                .Where(w => w.Title == title)
+                .FirstOrDefaultAsync();
+
+            if (work == null) return;
+
+            // その作品のクイズ数
+            var quizzes = await AppDb.Connection.Table<Quiz>()
+                .Where(q => q.WorkKey == work.WorkKey)
+                .ToListAsync();
+
+            if (quizzes == null || quizzes.Count == 0) return;
+
+            int firstQuizId = quizzes.OrderBy(q => q.QuizId).First().QuizId;
+
+            // クイズ回答画面へ（全画面）
+            var win = new Movie_AnimeQuizApp.Views.QuizPlayWindow(work.WorkKey, firstQuizId);
+            win.Owner = this;
+            win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            win.WindowState = WindowState.Maximized;
+
+            // メニュー/パネルを閉じる
+            if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
+            if (QuizMenu != null) QuizMenu.Visibility = Visibility.Collapsed;
+
+            this.Hide();
+            win.Closed += (_, __) => {
+                if (AppNav.ForceMain) return;
+                try { this.Show(); this.Activate(); } catch { }
+            };
+
+            win.Show();
+            win.WindowState = WindowState.Maximized; // ★保険（確実に最大化）
         }
+
 
         // ★クイズが無いなら何もしない（画面遷移しない）
         private async Task TryStartQuizAsync() {
@@ -378,6 +419,9 @@ namespace Movie_AnimeQuizApp {
             win.Owner = this;
             win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
+            // ★追加：全画面（最大化）
+            win.WindowState = WindowState.Maximized;
+
             if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
             if (QuizMenu != null) QuizMenu.Visibility = Visibility.Collapsed;
 
@@ -386,7 +430,9 @@ namespace Movie_AnimeQuizApp {
                 if (AppNav.ForceMain) return;
                 try { this.Show(); this.Activate(); } catch { }
             };
+
             win.Show();
+            win.WindowState = WindowState.Maximized; // ★保険
         }
 
         // ★XAMLが呼んでるので必須（クイズ作成）
@@ -394,6 +440,7 @@ namespace Movie_AnimeQuizApp {
             HideMenus();
 
             Window w = CreateWindowByTypeNames(new string[] {
+                "Movie_AnimeQuizApp.Views.QuizCreateWindow", // ★追加（これが本命）
                 "Movie_AnimeQuizApp.QuizCreateWindow",
                 "Movie_AnimeQuizApp.QuizCreate",
                 "Movie_AnimeQuizApp.QuizCreatePage"
@@ -855,6 +902,27 @@ namespace Movie_AnimeQuizApp {
             }
 
             public event PropertyChangedEventHandler PropertyChanged;
+        }
+
+        private void QuizDelete_Click(object sender, RoutedEventArgs e) {
+            HideMenus();
+
+            Window w = CreateWindowByTypeNames(new string[] {
+                "Movie_AnimeQuizApp.Views.QuizDeleteWindow",
+                "Movie_AnimeQuizApp.QuizDeleteWindow",
+                "Movie_AnimeQuizApp.QuizDelete"
+            });
+
+            if (w == null) {
+                MessageBox.Show("クイズ削除画面（QuizDeleteWindow）が見つかりません。");
+                return;
+            }
+
+            w.Owner = this;
+            w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            // ★後ろを消さない：Hideしない、モーダルで前に出す
+            w.ShowDialog();
         }
     }
 
