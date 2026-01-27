@@ -135,7 +135,7 @@
     </Compile>
     <Compile Include="QuizSearchHelper.cs" />
     <Compile Include="QuizSearchLauncher.cs" />
-    <Compile Include="QuizShare.cs" />
+    <Compile Include="Share\QuizShare.cs" />
     <Compile Include="SearchResultWindow.xaml.cs">
       <DependentUpon>SearchResultWindow.xaml</DependentUpon>
     </Compile>
