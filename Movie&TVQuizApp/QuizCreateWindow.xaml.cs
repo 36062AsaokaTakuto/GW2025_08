@@ -5,6 +5,7 @@ using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -433,6 +434,16 @@ namespace Movie_AnimeQuizApp.Views {
                 await AppDb.Connection.InsertAsync(new Choice { QuizId = quiz.QuizId, Text = c3, IsCorrect = (correctIndex == 3) });
 
                 MessageBox.Show("保存しました。");
+                await Movie_AnimeQuizApp.Share.QuizShare.AppendAsync(
+                    _selectedWork,
+                    quiz,
+                    new List<Choice> {
+                        new Choice { Text = c1, IsCorrect = (correctIndex == 1) },
+                        new Choice { Text = c2, IsCorrect = (correctIndex == 2) },
+                        new Choice { Text = c3, IsCorrect = (correctIndex == 3) },
+                    }
+                );
+
                 Close();
             }
             catch (Exception ex) {

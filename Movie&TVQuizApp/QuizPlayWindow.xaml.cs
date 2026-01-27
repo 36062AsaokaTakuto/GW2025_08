@@ -77,6 +77,8 @@ namespace Movie_AnimeQuizApp.Views {
 
         private async void QuizPlayWindow_Loaded(object sender, RoutedEventArgs e) {
             await AppDb.InitAsync();
+            try { await Movie_AnimeQuizApp.Share.QuizShare.ImportToDbAsync(); } catch { }
+
 
             _work = await AppDb.Connection.Table<Work>()
                 .Where(w => w.WorkKey == _workKey)
