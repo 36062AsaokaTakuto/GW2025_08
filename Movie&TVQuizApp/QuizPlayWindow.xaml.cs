@@ -1,12 +1,13 @@
-﻿// QuizPlayWindow.xaml.cs（修正後・全体）
-// ※DBから出題する仕組みはそのまま
-// ※Work.PosterPath が "/xxx.jpg" でも表示できるようにURL化を追加
-using Movie_AnimeQuizApp.Data;
+﻿using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Movie_AnimeQuizApp.QuizRuntime;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -25,9 +26,16 @@ namespace Movie_AnimeQuizApp.Views {
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private int _remainingSeconds;
 
-        private const int LimitSeconds = 60;
+        // ★制限時間：30秒
+        private const int LimitSeconds = 30;
 
         private const string TmdbPosterBase = "https://image.tmdb.org/t/p/w342";
+        private const string TmdbBackdropBase = "https://image.tmdb.org/t/p/w780";
+
+        private static readonly HttpClient _http = new HttpClient();
+
+        // ★「再度開かれた時に最初から」を安全にするため
+        private bool _isReady; // 問題が読み込めた後のみタイマー再開する
 
         public QuizPlayWindow(QuizSession session) {
             InitializeComponent();
@@ -36,6 +44,13 @@ namespace Movie_AnimeQuizApp.Views {
             _startQuizId = 0;
 
             Loaded += QuizPlayWindow_Loaded;
+
+            // ★閉じたらタイマー停止
+            Closing += QuizPlayWindow_Closing;
+            Closed += QuizPlayWindow_Closed;
+
+            // ★Hide→Show等でも最初から再スタート
+            IsVisibleChanged += QuizPlayWindow_IsVisibleChanged;
 
             _timer.Interval = TimeSpan.FromSeconds(1);
             _timer.Tick += Timer_Tick;
@@ -48,6 +63,13 @@ namespace Movie_AnimeQuizApp.Views {
             _startQuizId = quizId;
 
             Loaded += QuizPlayWindow_Loaded;
+
+            // ★閉じたらタイマー停止
+            Closing += QuizPlayWindow_Closing;
+            Closed += QuizPlayWindow_Closed;
+
+            // ★Hide→Show等でも最初から再スタート
+            IsVisibleChanged += QuizPlayWindow_IsVisibleChanged;
 
             _timer.Interval = TimeSpan.FromSeconds(1);
             _timer.Tick += Timer_Tick;
@@ -66,7 +88,11 @@ namespace Movie_AnimeQuizApp.Views {
             }
 
             try { WorkTitleText.Text = _work.Title ?? ""; } catch { }
-            SetPosterImage(ToPosterUrl(_work.PosterPath));
+
+            // ★背景：TMDB（Backdrop優先→Poster）
+            string bgUrl = ToBackdropUrl(_work.BackdropPath);
+            if (string.IsNullOrWhiteSpace(bgUrl)) bgUrl = ToPosterUrl(_work.PosterPath);
+            await SetBackgroundImageAsync(bgUrl);
 
             _allQuizzes = await AppDb.Connection.Table<Data.Entities.Quiz>()
                 .Where(q => q.WorkKey == _workKey)
@@ -83,7 +109,6 @@ namespace Movie_AnimeQuizApp.Views {
             }
 
             int quizIdToPlay = _startQuizId;
-
             if (quizIdToPlay <= 0) {
                 quizIdToPlay = QuizSession.Current.PickNextQuizIdAndMark(_allQuizzes);
             }
@@ -95,24 +120,46 @@ namespace Movie_AnimeQuizApp.Views {
 
             await LoadQuizAsync(quizIdToPlay);
 
-            StartTimer(LimitSeconds);
+            // ★ここまで来たらタイマー再開OK
+            _isReady = true;
+
+            // ★最初からカウント開始
+            RestartTimerFromBeginning();
         }
 
-        private string ToPosterUrl(string posterPathOrUrl) {
-            if (string.IsNullOrWhiteSpace(posterPathOrUrl)) return "";
-            if (posterPathOrUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return posterPathOrUrl;
-            if (posterPathOrUrl.StartsWith("/")) return TmdbPosterBase + posterPathOrUrl;
-            return posterPathOrUrl;
+        private void QuizPlayWindow_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e) {
+            // ★再表示されたら最初から数えなおす
+            if (this.IsVisible) {
+                if (_isReady) {
+                    RestartTimerFromBeginning();
+                }
+            } else {
+                // ★非表示/閉じる方向なら停止
+                StopTimer();
+            }
         }
 
-        private void StartTimer(int seconds) {
-            _remainingSeconds = seconds;
+        private void QuizPlayWindow_Closing(object sender, CancelEventArgs e) {
+            // ★閉じたらタイマー停止
+            StopTimer();
+        }
+
+        private void QuizPlayWindow_Closed(object sender, EventArgs e) {
+            // ★完全に閉じた後も念のため
+            StopTimer();
+            _timer.Tick -= Timer_Tick;
+            _isReady = false;
+        }
+
+        private void RestartTimerFromBeginning() {
+            StopTimer();
+            _remainingSeconds = LimitSeconds;
             try { TimerText.Text = _remainingSeconds.ToString(); } catch { }
             _timer.Start();
         }
 
         private void StopTimer() {
-            _timer.Stop();
+            try { _timer.Stop(); } catch { }
         }
 
         private void Timer_Tick(object sender, EventArgs e) {
@@ -206,8 +253,11 @@ namespace Movie_AnimeQuizApp.Views {
         private void OpenResultWindow(bool isCorrect, int quizId) {
             try {
                 var win = new QuizResultWindow(_workKey, quizId, isCorrect);
-                win.Owner = this.Owner;
-                win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+                // ★全画面（最大化）
+                win.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                win.WindowState = WindowState.Maximized;
+
                 win.Show();
             }
             catch {
@@ -216,17 +266,55 @@ namespace Movie_AnimeQuizApp.Views {
             Close();
         }
 
-        private void SetPosterImage(string posterPathOrUrl) {
-            if (string.IsNullOrWhiteSpace(posterPathOrUrl)) return;
+
+        private string ToPosterUrl(string posterPathOrUrl) {
+            if (string.IsNullOrWhiteSpace(posterPathOrUrl)) return "";
+            if (posterPathOrUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return posterPathOrUrl;
+
+            // "/xxx.jpg" でも "xxx.jpg" でもOK
+            if (!posterPathOrUrl.StartsWith("/")) posterPathOrUrl = "/" + posterPathOrUrl;
+            return TmdbPosterBase + posterPathOrUrl;
+        }
+
+        private string ToBackdropUrl(string backdropPathOrUrl) {
+            if (string.IsNullOrWhiteSpace(backdropPathOrUrl)) return "";
+            if (backdropPathOrUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return backdropPathOrUrl;
+
+            // "/xxx.jpg" でも "xxx.jpg" でもOK
+            if (!backdropPathOrUrl.StartsWith("/")) backdropPathOrUrl = "/" + backdropPathOrUrl;
+            return TmdbBackdropBase + backdropPathOrUrl;
+        }
+
+        // ★背景が出ない対策：HttpClientで取得→StreamSourceで表示（安定）
+        private async System.Threading.Tasks.Task SetBackgroundImageAsync(string imageUrl) {
+            if (string.IsNullOrWhiteSpace(imageUrl)) {
+                try { BackgroundImage.Source = null; } catch { }
+                return;
+            }
 
             try {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = new Uri(posterPathOrUrl, UriKind.RelativeOrAbsolute);
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.EndInit();
+                // TLS 1.2 対応（古い環境対策）
+                try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
+
+                // 保険：User-Agent
+                if (_http.DefaultRequestHeaders.UserAgent.Count == 0) {
+                    _http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
+                }
+
+                byte[] bytes = await _http.GetByteArrayAsync(imageUrl);
+
+                using (var ms = new MemoryStream(bytes)) {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.StreamSource = ms;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    BackgroundImage.Source = bmp;
+                }
             }
             catch {
+                try { BackgroundImage.Source = null; } catch { }
             }
         }
     }

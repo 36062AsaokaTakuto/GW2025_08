@@ -12,7 +12,7 @@
             <Setter Property="Background" Value="#17181D"/>
             <Setter Property="CornerRadius" Value="16"/>
             <Setter Property="BorderBrush" Value="#2A2C34"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
             <Setter Property="Effect">
                 <Setter.Value>
@@ -41,11 +41,12 @@
                                               RecognizesAccessKey="True"/>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <!-- ★ホバー/押下も半透明 -->
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#2A2D38"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#802A2D38"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#3A3E4D"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#803A3E4D"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
@@ -67,77 +68,177 @@
             <Setter Property="FontSize" Value="12"/>
         </Style>
 
+        <!-- ★QuizCreateWindowと同じ：ラベル -->
+        <Style x:Key="LabelTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#EDEDED"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="6" ShadowDepth="0" Opacity="0.35"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ★内側の枠：枠線を消す（BorderThickness=0） -->
+        <Style x:Key="SmallFieldBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#3020222A"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
     </Window.Resources>
 
-    <Border CornerRadius="22" Background="#0E0F12" Padding="18">
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="220"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+    <Grid>
+        <Image x:Name="BackgroundImage"
+               Stretch="UniformToFill"
+               Opacity="1.0"/>
 
-            <!-- 左：作品画像 -->
-            <Border Grid.Column="0" Grid.Row="0" Grid.RowSpan="3"
-                    Style="{StaticResource CardBorderStyle}" Margin="0,0,16,0" Padding="0">
-                <Grid ClipToBounds="True">
-                    <Border CornerRadius="16">
-                        <Border.Background>
-                            <ImageBrush ImageSource="{Binding ElementName=PosterImage, Path=Source}" Stretch="UniformToFill"/>
-                        </Border.Background>
+        <!-- 暗幕 -->
+        <Border Background="#B30E0F12"/>
+
+        <Border CornerRadius="22" Background="Transparent" Padding="18">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- 上：右上に制限時間 / 作品名は中央 -->
+                <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border x:Name="TimerCard"
+                            Grid.Row="0"
+                            Background="Transparent"
+                            Style="{StaticResource CardBorderStyle}"
+                            Padding="63"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,0,0,6">
+                        <StackPanel>
+                            <TextBlock Text="制限時間"
+                                       Style="{StaticResource SubtleTextStyle}"
+                                       HorizontalAlignment="Center"
+                                       FontSize="43"/>
+                            <TextBlock x:Name="TimerText"
+                                       Text="30"
+                                       FontSize="46"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,6,0,0"/>
+                        </StackPanel>
                     </Border>
+
+                    <TextBlock x:Name="WorkTitleText"
+                               Grid.Row="1"
+                               Style="{StaticResource TitleTextStyle}"
+                               Text=""
+                               FontSize="70"
+                               TextTrimming="CharacterEllipsis"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
                 </Grid>
-            </Border>
 
-            <!-- 上：作品名 -->
-            <StackPanel Grid.Column="1" Grid.Row="0" Margin="0,0,16,12">
-                <TextBlock x:Name="WorkTitleText" Style="{StaticResource TitleTextStyle}"
-                           Text="TITLE" HorizontalAlignment="Center" FontSize="30"/>
-            </StackPanel>
+                <!-- 中：問題文 -->
+                <Border Grid.Row="1"
+                        Style="{StaticResource CardBorderStyle}"
+                        Margin="0,60,0,60"
+                        Background="#8017181D"
+                        Padding="18">
+                    <Grid>
+                        <TextBlock x:Name="QuestionText"
+                                   Text="QUESTION"
+                                   TextWrapping="Wrap"
+                                   FontSize="33"
+                                   TextAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"/>
+                    </Grid>
+                </Border>
 
-            <!-- 右上：制限時間 -->
-            <Border Grid.Column="2" Grid.Row="0" Style="{StaticResource CardBorderStyle}" Padding="14">
-                <StackPanel>
-                    <TextBlock Text="制限時間" Style="{StaticResource SubtleTextStyle}" HorizontalAlignment="Center" FontSize="25"/>
-                    <TextBlock x:Name="TimerText" Text="60"
-                               FontSize="34" FontWeight="Bold"
-                               HorizontalAlignment="Center" Margin="0,6,0,0"/>
-                </StackPanel>
-            </Border>
+                <!-- 下：選択肢（枠なし） -->
+                <Border Grid.Row="2" Margin="0,14,0,0" Background="Transparent">
+                    <UniformGrid Rows="1" Columns="3" HorizontalAlignment="Stretch">
 
-            <!-- 中：問題文 -->
-            <Border Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource CardBorderStyle}"
-                    Margin="0,10,16,0" Padding="18" Grid.Row="1">
-                <Grid>
-                    <TextBlock x:Name="QuestionText"
-                               Text="QUESTION"
-                               TextWrapping="Wrap"
-                               FontSize="20"
-                               TextAlignment="Center"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Center"/>
-                </Grid>
-            </Border>
+                        <!-- Choice 1：外側枠なし -->
+                        <Border Background="#6617181D"
+                                CornerRadius="16"
+                                BorderThickness="0"
+                                Padding="10"
+                                Margin="0,0,10,0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-            <!-- 下：選択肢（横3つ） -->
-            <Border Grid.Column="1" Grid.Row="2" Margin="0,14,16,0" Background="Transparent">
-                <UniformGrid Rows="1" Columns="3" HorizontalAlignment="Stretch">
-                    <Button x:Name="ChoiceBtn1" Click="Choice_Click" Margin="0,0,10,0"
-                            Style="{StaticResource FlatButtonStyle}" Height="64"/>
-                    <Button x:Name="ChoiceBtn2" Click="Choice_Click" Margin="0,0,10,0"
-                            Style="{StaticResource FlatButtonStyle}" Height="64"/>
-                    <Button x:Name="ChoiceBtn3" Click="Choice_Click"
-                            Style="{StaticResource FlatButtonStyle}" Height="64"/>
-                </UniformGrid>
-            </Border>
+                                <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0">
+                                    <Button x:Name="ChoiceBtn1"
+                                            Click="Choice_Click"
+                                            Style="{StaticResource FlatButtonStyle}"
+                                            Background="Transparent"
+                                            Height="92"
+                                            FontSize="25"
+                                            Padding="18,14"/>
+                                </Border>
+                            </Grid>
+                        </Border>
 
-            <!-- ★右下の「次の問題へ」は削除（結果画面に移動） -->
+                        <!-- Choice 2：外側枠なし -->
+                        <Border Background="#6617181D"
+                                CornerRadius="16"
+                                BorderThickness="0"
+                                Padding="10"
+                                Margin="0,0,10,0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-        </Grid>
-    </Border>
+                                <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0">
+                                    <Button x:Name="ChoiceBtn2"
+                                            Click="Choice_Click"
+                                            Style="{StaticResource FlatButtonStyle}"
+                                            Background="Transparent"
+                                            Height="92"
+                                            FontSize="25"
+                                            Padding="18,14"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- Choice 3：外側枠なし -->
+                        <Border Background="#6617181D"
+                                CornerRadius="16"
+                                BorderThickness="0"
+                                Padding="10"
+                                Margin="0,0,0,0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0">
+                                    <Button x:Name="ChoiceBtn3"
+                                            Click="Choice_Click"
+                                            Style="{StaticResource FlatButtonStyle}"
+                                            Background="Transparent"
+                                            Height="92"
+                                            FontSize="25"
+                                            Padding="18,14"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                    </UniformGrid>
+                </Border>
+
+            </Grid>
+        </Border>
+    </Grid>
 </Window>
