@@ -68,6 +68,13 @@ namespace Movie_AnimeQuizApp.Views {
 
             if (quizzes == null) quizzes = new List<Quiz>();
 
+            // ★追加：作成日順（古い→新しい）に並べ替え
+            // CreatedAt が "yyyy-MM-dd HH:mm:ss" 前提なので文字列比較でOK
+            quizzes = quizzes
+                .OrderBy(q => (q != null ? (q.CreatedAt ?? "") : ""))
+                .ThenBy(q => (q != null ? q.QuizId : 0))
+                .ToList();
+
             var works = await AppDb.Connection.Table<Work>().ToListAsync();
             if (works == null) works = new List<Work>();
 
@@ -100,6 +107,7 @@ namespace Movie_AnimeQuizApp.Views {
 
             StatusText.Text = "件数: " + _items.Count.ToString();
         }
+
 
         private async void DeleteSelected_Click(object sender, RoutedEventArgs e) {
             var sel = QuizList.SelectedItem as QuizDeleteItem;
