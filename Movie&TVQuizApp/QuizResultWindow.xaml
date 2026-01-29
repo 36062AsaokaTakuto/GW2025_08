@@ -1,11 +1,10 @@
 ﻿<Window x:Class="Movie_AnimeQuizApp.Views.QuizResultWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Result"
-        WindowStartupLocation="CenterScreen"
+        Title="Result" WindowStartupLocation="CenterScreen"
         WindowState="Maximized"
-        Background="#0E0F12"
-        Foreground="#EDEDED">
+        Background="#0E0F12" Foreground="#EDEDED"  
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize">
 
     <Window.Resources>
         <Style x:Key="CardBorderStyle" TargetType="Border">

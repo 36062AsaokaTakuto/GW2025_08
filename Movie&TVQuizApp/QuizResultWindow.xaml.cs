@@ -1,7 +1,6 @@
 ﻿using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Movie_AnimeQuizApp.QuizRuntime;
-using Movie_AnimeQuizApp.Share;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -53,24 +52,22 @@ namespace Movie_AnimeQuizApp.Views {
             ResultText.RenderTransformOrigin = new Point(0.5, 0.5);
             ResultText.RenderTransform = new ScaleTransform(scale, scale);
 
-            // 背景は並行で（文字を先に出す）
+            // 背景は並行（文字を先に出す）
             var bgTask = LoadBackgroundAsync(_workKey);
 
-            // 文字（問題文・正解）は先に
+            // 問題文＋正解
             await LoadQuizAndCorrectAnswerAsync(_quizId);
 
-            // ★分母：この作品の登録問題数（最新）
+            // ★分母は最新DB件数（新規登録も反映）
             int total = 0;
             try {
                 total = await AppDb.Connection.Table<Quiz>()
                     .Where(q => q.WorkKey == _workKey)
                     .CountAsync();
             }
-            catch {
-                total = 0;
-            }
+            catch { total = 0; }
 
-            // ★次の問題へ用：同じく最新リストを取り直す（新規登録分も含む）
+            // Next判定用のリストも最新に
             try {
                 _allQuizzes = await AppDb.Connection.Table<Quiz>()
                     .Where(q => q.WorkKey == _workKey)
@@ -80,21 +77,18 @@ namespace Movie_AnimeQuizApp.Views {
                 _allQuizzes = new List<Quiz>();
             }
 
-            // 正解数はセッションのCorrectCount（同一作品のときだけ）
             int correct = 0;
             if (QuizSession.Current != null && QuizSession.Current.IsSameWork(_workKey)) {
                 correct = QuizSession.Current.CorrectCount;
             }
             ProgressText.Text = correct.ToString() + " / " + total.ToString();
 
-            // ★残りが無ければ Next を押せない
             bool canNext = false;
             if (QuizSession.Current != null && QuizSession.Current.IsSameWork(_workKey)) {
                 canNext = QuizSession.Current.HasRemaining(_allQuizzes);
             }
             NextBtn.IsEnabled = canNext;
 
-            // 背景の完了は最後でOK
             try { await bgTask; } catch { }
         }
 
@@ -168,10 +162,7 @@ namespace Movie_AnimeQuizApp.Views {
             if (QuizSession.Current == null) { NextBtn.IsEnabled = false; return; }
             if (!QuizSession.Current.IsSameWork(_workKey)) { NextBtn.IsEnabled = false; return; }
 
-            // ★追加：次の問題を探す前に共有ファイル→DB取り込み
-            try { await QuizShare.ImportToDbAsync(); } catch { }
-
-            // ★念のため毎回最新に（新規登録が途中で増えても追従）
+            // ★毎回最新に（追加登録が途中で増えても追従）
             try {
                 _allQuizzes = await AppDb.Connection.Table<Quiz>()
                     .Where(q => q.WorkKey == _workKey)
@@ -193,8 +184,11 @@ namespace Movie_AnimeQuizApp.Views {
             }
 
             var win = new QuizPlayWindow(_workKey, nextQuizId);
+
+            // ★Ownerはホームを引き継ぐ（閉じるでホームへ戻すため）
             win.Owner = this.Owner;
 
+            //★次に開く回答画面を最大化したい場合（必要なら有効）
             win.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             win.WindowState = WindowState.Maximized;
 
@@ -202,10 +196,22 @@ namespace Movie_AnimeQuizApp.Views {
             Close();
         }
 
-
         private void CloseBtn_Click(object sender, RoutedEventArgs e) {
-            // ★閉じるボタンで正答率リセット（セッション破棄）
+            // ★セッションをリセット（正答率・出題済み）
             QuizSession.Clear();
+
+            // ★何問解いた後でも必ずホームへ戻す
+            try {
+                Window home = this.Owner ?? Application.Current?.MainWindow;
+                if (home != null) {
+                    if (home.WindowState == WindowState.Minimized) home.WindowState = WindowState.Normal;
+                    home.Show();
+                    home.Activate();
+                    home.Focus();
+                }
+            }
+            catch { }
+
             Close();
         }
     }

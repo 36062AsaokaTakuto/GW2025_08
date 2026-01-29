@@ -1,12 +1,12 @@
-﻿<!-- QuizCreateWindow.xaml（ラベル見やすく/QuestionTextBoxを下げて隙間詰め） -->
-<Window x:Class="Movie_AnimeQuizApp.Views.QuizCreateWindow"
+﻿<Window x:Class="Movie_AnimeQuizApp.Views.QuizCreateWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Quiz Create" Height="600" Width="1040"
         WindowStartupLocation="CenterScreen"
         Background="#0E0F12"
         Foreground="#EDEDED"
-        Loaded="Window_Loaded">
+        Loaded="Window_Loaded"
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize">
 
     <Window.Resources>
 

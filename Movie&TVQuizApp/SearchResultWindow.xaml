@@ -6,8 +6,9 @@
         WindowState="Maximized"
         Background="Black"
         Width="1000"
-        PreviewMouseDown="Window_PreviewMouseDown">
-<!--git-->
+        PreviewMouseDown="Window_PreviewMouseDown"
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize">
+
     <Window.Resources>
 
         <!-- =========================

@@ -1,17 +1,13 @@
-﻿<!-- QuizDeleteWindow.xaml（修正後・全体）
-  変更点：
-  1) CreatedByTextBox：最初に「作成者を入力」表示、クリックで消える（TextBox + Watermark TextBlock）
-  2) ListBoxの1件表示を横長（ItemTemplateのGrid 2列＋右寄せメタ）
-  ※他は触っていない
--->
-<Window x:Class="Movie_AnimeQuizApp.Views.QuizDeleteWindow"
+﻿<Window x:Class="Movie_AnimeQuizApp.Views.QuizDeleteWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Quiz Delete" Height="650" Width="980"
         WindowStartupLocation="CenterOwner"
         Background="#0E0F12"
         Foreground="#EDEDED"
-        Loaded="Window_Loaded">
+        Loaded="Window_Loaded"
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize">
+
 
     <Window.Resources>
 

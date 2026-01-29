@@ -5,7 +5,8 @@
         Title="Media Browser"
         WindowState="Maximized"
         Background="#101010"
-        PreviewMouseDown="Window_PreviewMouseDown">
+        PreviewMouseDown="Window_PreviewMouseDown"
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize">
 
     <Window.Resources>
 

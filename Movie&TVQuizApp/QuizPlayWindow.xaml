@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Quiz" Height="600" Width="1040"
         WindowStartupLocation="CenterScreen"
-        Background="#0E0F12"
-        Foreground="#EDEDED">
+        Background="#0E0F12" Foreground="#EDEDED" 
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize">
 
     <Window.Resources>
 
@@ -148,7 +148,7 @@
                 <!-- 中：問題文 -->
                 <Border Grid.Row="1"
                         Style="{StaticResource CardBorderStyle}"
-                        Margin="0,60,0,60"
+                        Margin="140,70,140,70"
                         Background="#8017181D"
                         Padding="18">
                     <Grid>
