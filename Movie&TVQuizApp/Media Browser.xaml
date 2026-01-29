@@ -364,55 +364,102 @@
                             Click="QuizDelete_Click"/>
                     </StackPanel>
 
-                    <!-- 下：クイズ検索ボックス（TextBlockプレースホルダー） -->
+                    <!-- 下：クイズ検索ボックス（入力中は消えない） -->
                     <Border x:Name="QuizSearchPanel"
                             Visibility="Collapsed"
                             Margin="10,10,10,0"
                             Background="Transparent"
                             MouseEnter="QuizSearchPanel_MouseEnter"
                             MouseLeave="QuizSearchPanel_MouseLeave">
-                        <Border Background="#66000000"
-                                BorderBrush="#808080"
-                                BorderThickness="2"
-                                CornerRadius="10"
-                                Padding="10"
-                                Width="340">
-                            <Grid>
-                                <!-- 入力本体 -->
-                                <TextBox x:Name="QuizSearchTextBox"
-                                         FontSize="16"
+
+                        <!-- ★ここだけ追加：検索BOXの下に候補リストを追加（MainWindowと同じ） -->
+                        <StackPanel Width="340">
+
+                            <!-- 検索BOX -->
+                            <Border Background="#66000000"
+                                    BorderBrush="#808080"
+                                    BorderThickness="2"
+                                    CornerRadius="10"
+                                    Padding="10"
+                                    Width="340">
+                                <Grid>
+                                    <!-- 入力本体 -->
+                                    <TextBox x:Name="QuizSearchTextBox"
+                                             FontSize="16"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Foreground="White"
+                                             VerticalContentAlignment="Center"
+                                             CaretBrush="White"
+                                             Cursor="IBeam"
+                                             GotFocus="QuizSearch_GotFocus"
+                                             LostFocus="QuizSearch_LostFocus"
+                                             PreviewKeyDown="QuizSearch_PreviewKeyDown"
+                                             PreviewMouseLeftButtonDown="QuizSearch_PreviewMouseLeftButtonDown"
+                                             TextChanged="QuizSearch_TextChanged"/>
+
+                                    <!-- プレースホルダー：入力扱いにならない -->
+                                    <TextBlock Text="クイズしたい作品名を入力"
+                                               Foreground="Gray"
+                                               FontSize="16"
+                                               Margin="2,0,0,0"
+                                               VerticalAlignment="Center"
+                                               IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=QuizSearchTextBox, Path=Text}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+
+                            <!-- ★追加：DBに登録されている作品候補（クイズがある作品） -->
+                            <Border x:Name="QuizWorkSuggestBorder"
+                                    Visibility="Collapsed"
+                                    Margin="0,8,0,0"
+                                    Width="340"
+                                    Background="#DD111111"
+                                    CornerRadius="10"
+                                    BorderBrush="#2A2A2A"
+                                    BorderThickness="1">
+                                <ListBox x:Name="QuizWorkSuggestList"
                                          Background="Transparent"
                                          BorderThickness="0"
                                          Foreground="White"
-                                         VerticalContentAlignment="Center"
-                                         CaretBrush="White"
-                                         Cursor="IBeam"
-                                         GotFocus="QuizSearch_GotFocus"
-                                         LostFocus="QuizSearch_LostFocus"
-                                         PreviewKeyDown="QuizSearch_PreviewKeyDown"
-                                         PreviewMouseLeftButtonDown="QuizSearch_PreviewMouseLeftButtonDown"
-                                         TextChanged="QuizSearch_TextChanged"/>
+                                         SelectionMode="Single"
+                                         MaxHeight="260"
+                                         ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                                         MouseLeftButtonUp="QuizWorkSuggestList_MouseLeftButtonUp">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="50"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
 
-                                <!-- プレースホルダー：入力扱いにならない -->
-                                <TextBlock Text="クイズしたい作品名を入力"
-                                           Foreground="Gray"
-                                           FontSize="16"
-                                           Margin="2,0,0,0"
-                                           VerticalAlignment="Center"
-                                           IsHitTestVisible="False">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ElementName=QuizSearchTextBox, Path=Text}" Value="">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                        </Border>
+                                                <Border Width="46" Height="68" CornerRadius="6" ClipToBounds="True" Background="#222">
+                                                    <Image Stretch="UniformToFill" Source="{Binding PosterThumbUrl}"/>
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                                    <TextBlock Text="{Binding Title}" FontSize="14" Foreground="White" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Sub}" FontSize="12" Foreground="#BFBFBF" Margin="0,3,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+
+                        </StackPanel>
                     </Border>
                 </StackPanel>
             </Border>

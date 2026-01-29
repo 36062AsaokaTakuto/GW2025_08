@@ -2,11 +2,13 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,6 +17,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Text;
+
 
 // ★クイズ起動用（QuizSessionは使わない）
 using Movie_AnimeQuizApp.Data;
@@ -22,6 +26,9 @@ using Movie_AnimeQuizApp.Data.Entities;
 
 namespace Movie_AnimeQuizApp {
     public partial class SearchResultWindow : Window {
+
+        private static readonly HttpClient _http = new HttpClient();
+
         private readonly string _apiKey;
         private readonly string _query;
         private readonly bool _useId;
@@ -37,6 +44,10 @@ namespace Movie_AnimeQuizApp {
         // ===== MediaBrowserと同じ：メニュー非表示タイマー =====
         private readonly DispatcherTimer _menuHideTimer = new DispatcherTimer();
 
+        // ===== ★追加：クイズ検索（DB候補）=====
+        private readonly ObservableCollection<QuizWorkSuggestItem> _quizWorkSuggestions = new ObservableCollection<QuizWorkSuggestItem>();
+        private CancellationTokenSource _ctsQuizWorkSuggest;
+
         public SearchResultWindow(string query, string apiKey) {
             InitializeComponent();
 
@@ -47,6 +58,11 @@ namespace Movie_AnimeQuizApp {
             // XAMLに付いてなくても動くようにコードで付与
             PreviewMouseDown += Window_PreviewMouseDown;
             Activated += SearchResultWindow_Activated;
+
+            // ★候補ListのItemsSource
+            if (QuizWorkSuggestList != null) {
+                QuizWorkSuggestList.ItemsSource = _quizWorkSuggestions;
+            }
 
             InitHeaderMenus();
 
@@ -64,6 +80,11 @@ namespace Movie_AnimeQuizApp {
 
             PreviewMouseDown += Window_PreviewMouseDown;
             Activated += SearchResultWindow_Activated;
+
+            // ★候補ListのItemsSource
+            if (QuizWorkSuggestList != null) {
+                QuizWorkSuggestList.ItemsSource = _quizWorkSuggestions;
+            }
 
             InitHeaderMenus();
 
@@ -93,10 +114,19 @@ namespace Movie_AnimeQuizApp {
         }
 
         // =========================
-        // 外クリック：クイズ検索のフォーカス制御（MediaBrowserと同じ）
+        // 外クリック：クイズ検索のフォーカス制御 + 候補を閉じる
         // =========================
         private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e) {
             DependencyObject src = e.OriginalSource as DependencyObject;
+
+            // ★候補を閉じる（検索ボックス/候補以外）
+            if (QuizWorkSuggestBorder != null && QuizWorkSuggestBorder.Visibility == Visibility.Visible) {
+                bool insideBox = (QuizSearchTextBox != null && src != null && IsDescendant(src, QuizSearchTextBox));
+                bool insideSuggest = (src != null && IsDescendant(src, QuizWorkSuggestBorder));
+                if (!insideBox && !insideSuggest) {
+                    HideQuizWorkSuggest();
+                }
+            }
 
             if (QuizSearchTextBox != null && QuizSearchTextBox.IsKeyboardFocusWithin) {
                 if (src == null || !IsDescendant(src, QuizSearchTextBox)) {
@@ -186,22 +216,24 @@ namespace Movie_AnimeQuizApp {
         // クイズ：検索パネル（ホバーで表示）
         // =========================
         private void QuizSearchHit_MouseEnter(object sender, MouseEventArgs e) {
-            CancelMenuHide();
+            _menuHideTimer.Stop();
             if (QuizMenu != null) QuizMenu.Visibility = Visibility.Visible;
             ShowQuizSearchPanel();
         }
 
         private void QuizSearchHit_MouseLeave(object sender, MouseEventArgs e) {
-            ScheduleMenuHide();
+            _menuHideTimer.Stop();
+            _menuHideTimer.Start();
         }
 
         private void QuizSearchPanel_MouseEnter(object sender, MouseEventArgs e) {
-            CancelMenuHide();
+            _menuHideTimer.Stop();
         }
 
         private void QuizSearchPanel_MouseLeave(object sender, MouseEventArgs e) {
             if (QuizSearchTextBox != null && QuizSearchTextBox.IsKeyboardFocusWithin) return;
-            ScheduleMenuHide();
+            _menuHideTimer.Stop();
+            _menuHideTimer.Start();
         }
 
         private void ShowQuizSearchPanel() {
@@ -211,12 +243,15 @@ namespace Movie_AnimeQuizApp {
         private void HideQuizSearchPanel() {
             if (QuizSearchTextBox != null && QuizSearchTextBox.IsKeyboardFocusWithin) return;
             if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
+
+            // ★追加：パネル閉じる時は候補も閉じる
+            HideQuizWorkSuggest();
         }
 
         private void QuizSearch_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) {
             if (QuizSearchTextBox == null) return;
 
-            CancelMenuHide();
+            _menuHideTimer.Stop();
             if (QuizMenu != null) QuizMenu.Visibility = Visibility.Visible;
             if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Visible;
 
@@ -229,7 +264,7 @@ namespace Movie_AnimeQuizApp {
         private void QuizSearch_GotFocus(object sender, RoutedEventArgs e) {
             if (QuizSearchTextBox == null) return;
 
-            CancelMenuHide();
+            _menuHideTimer.Stop();
             if (QuizMenu != null) QuizMenu.Visibility = Visibility.Visible;
             if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Visible;
 
@@ -240,22 +275,28 @@ namespace Movie_AnimeQuizApp {
             if (QuizSearchTextBox == null) return;
 
             QuizSearchTextBox.IsReadOnlyCaretVisible = false;
-            ScheduleMenuHide();
+            _menuHideTimer.Stop();
+            _menuHideTimer.Start();
         }
 
         private void QuizSearch_TextChanged(object sender, TextChangedEventArgs e) {
             if (QuizSearchTextBox == null) return;
-            if (QuizSearchTextBox.IsKeyboardFocusWithin) CancelMenuHide();
+            if (QuizSearchTextBox.IsKeyboardFocusWithin) _menuHideTimer.Stop();
+
+            // ★追加：DB候補更新
+            StartQuizWorkSuggestDebounce((QuizSearchTextBox.Text ?? "").Trim());
         }
 
         private async void QuizSearch_PreviewKeyDown(object sender, KeyEventArgs e) {
             if (e.Key == Key.Escape) {
+                HideQuizWorkSuggest();
                 Keyboard.ClearFocus();
                 e.Handled = true;
                 return;
             }
 
             if (e.Key == Key.Enter) {
+                HideQuizWorkSuggest();
                 e.Handled = true;
                 await TryStartQuizAsync();
             }
@@ -271,6 +312,7 @@ namespace Movie_AnimeQuizApp {
                 QuizSearchTextBox.Focus();
             }
 
+            HideQuizWorkSuggest();
             await TryStartQuizAsync();
         }
 
@@ -299,9 +341,9 @@ namespace Movie_AnimeQuizApp {
             win.Owner = this;
             win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
-            // ★ここが重要：最大化（念のため Show 前後どっちでも効くように）
             win.WindowState = WindowState.Maximized;
 
+            HideQuizWorkSuggest();
             if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
             if (QuizMenu != null) QuizMenu.Visibility = Visibility.Collapsed;
 
@@ -312,7 +354,196 @@ namespace Movie_AnimeQuizApp {
             };
 
             win.Show();
-            win.WindowState = WindowState.Maximized; // ★保険
+            win.WindowState = WindowState.Maximized;
+        }
+
+        // =========================
+        // ★クイズ候補（DB：クイズがある作品）
+        // =========================
+        private void StartQuizWorkSuggestDebounce(string q) {
+            if (string.IsNullOrWhiteSpace(q)) {
+                HideQuizWorkSuggest();
+                return;
+            }
+
+            if (_ctsQuizWorkSuggest != null) _ctsQuizWorkSuggest.Cancel();
+            _ctsQuizWorkSuggest = new CancellationTokenSource();
+            var token = _ctsQuizWorkSuggest.Token;
+
+            _ = Task.Run(async () => {
+                try {
+                    await Task.Delay(220, token);
+                    if (token.IsCancellationRequested) return;
+
+                    var list = await FetchQuizWorkSuggestionsAsync(q, token);
+                    if (token.IsCancellationRequested) return;
+
+                    await Dispatcher.InvokeAsync(() => {
+                        _quizWorkSuggestions.Clear();
+                        for (int i = 0; i < list.Count; i++) _quizWorkSuggestions.Add(list[i]);
+
+                        if (_quizWorkSuggestions.Count > 0) ShowQuizWorkSuggest();
+                        else HideQuizWorkSuggest();
+                    });
+                }
+                catch { }
+            });
+        }
+
+        private async Task<List<QuizWorkSuggestItem>> FetchQuizWorkSuggestionsAsync(string query, CancellationToken token) {
+            var ret = new List<QuizWorkSuggestItem>();
+
+            try {
+                await AppDb.InitAsync();
+
+                // Quiz側（どの作品にクイズがあるか）
+                var quizList = await AppDb.Connection.Table<Quiz>().ToListAsync();
+                if (quizList == null || quizList.Count == 0) return ret;
+
+                var hasQuizKeys = new HashSet<string>(
+                    quizList.Where(q => q != null && !string.IsNullOrWhiteSpace(q.WorkKey))
+                            .Select(q => q.WorkKey)
+                );
+                if (hasQuizKeys.Count == 0) return ret;
+
+                // Work側（タイトル/ポスター等）
+                var works = await AppDb.Connection.Table<Work>().ToListAsync();
+                if (works == null || works.Count == 0) return ret;
+
+                string nq = Normalize(query);
+
+                for (int i = 0; i < works.Count; i++) {
+                    if (token.IsCancellationRequested) break;
+
+                    var w = works[i];
+                    if (w == null) continue;
+
+                    string wk = w.WorkKey ?? "";
+                    if (wk.Length == 0) continue;
+                    if (!hasQuizKeys.Contains(wk)) continue;
+
+                    string title = w.Title ?? "";
+                    if (title.Length == 0) continue;
+
+                    string nt = Normalize(title);
+                    if (!(nt.StartsWith(nq) || nt.Contains(nq))) continue;
+
+                    string mt = (w.MediaType ?? "");
+                    string dateText = ToJaDate(w.ReleaseDate ?? "");
+
+                    string sub = (mt == "movie" ? "映画" : (mt == "tv" ? "テレビ番組" : ""))
+                               + (string.IsNullOrWhiteSpace(dateText) ? "" : " ・ " + dateText);
+
+                    ret.Add(new QuizWorkSuggestItem {
+                        WorkKey = wk,
+                        Title = title,
+                        Sub = sub,
+                        PosterThumbUrl = BuildPosterThumbUrlFromStoredPath(w.PosterPath),
+                        NormTitle = nt,
+                        NormQuery = nq
+                    });
+                }
+
+                // 表示順：先頭一致→タイトル昇順、最大10件
+                ret = ret
+                    .OrderByDescending(s => s.NormTitle.StartsWith(s.NormQuery))
+                    .ThenBy(s => s.Title, StringComparer.CurrentCulture)
+                    .Take(10)
+                    .ToList();
+
+                return ret;
+            }
+            catch {
+                return ret;
+            }
+        }
+
+        private void ShowQuizWorkSuggest() {
+            if (QuizWorkSuggestBorder != null) QuizWorkSuggestBorder.Visibility = Visibility.Visible;
+        }
+
+        private void HideQuizWorkSuggest() {
+            if (QuizWorkSuggestBorder != null) QuizWorkSuggestBorder.Visibility = Visibility.Collapsed;
+            if (QuizWorkSuggestList != null) QuizWorkSuggestList.SelectedIndex = -1;
+            _quizWorkSuggestions.Clear();
+        }
+
+        private void QuizWorkSuggestList_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) {
+            if (QuizWorkSuggestList == null) return;
+
+            var it = QuizWorkSuggestList.SelectedItem as QuizWorkSuggestItem;
+            if (it == null) return;
+
+            if (QuizSearchTextBox != null) {
+                QuizSearchTextBox.Text = it.Title ?? "";
+            }
+
+            HideQuizWorkSuggest();
+
+            // そのままクイズ開始
+            _ = TryStartQuizAsync();
+        }
+
+        private static string BuildPosterThumbUrlFromStoredPath(string posterPathOrUrl) {
+            if (string.IsNullOrWhiteSpace(posterPathOrUrl)) return "";
+            string p = posterPathOrUrl.Trim();
+
+            if (p.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                p.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) {
+                return p;
+            }
+
+            // Work.PosterPath が "/xxxx.jpg" 形式の想定
+            if (!p.StartsWith("/")) p = "/" + p;
+            return "https://image.tmdb.org/t/p/w92" + p;
+        }
+
+        private static string Normalize(string s) {
+            if (s == null) return "";
+
+            // 1) 前後空白除去
+            s = s.Trim();
+
+            // 2) 半角ｶﾀｶﾅ → 全角カタカナ、全角英数なども統一（NFKC）
+            s = s.Normalize(NormalizationForm.FormKC);
+
+            // 3) 空白除去 + 小文字化 + カタカナ→ひらがな統一
+            var sb = new StringBuilder(s.Length);
+
+            foreach (char ch in s) {
+                if (char.IsWhiteSpace(ch)) continue;
+
+                char c = char.ToLowerInvariant(ch);
+
+                // 全角カタカナ(ァ=30A1 ～ ヶ=30F6) を ひらがな(ぁ=3041 ～ ゖ=3096) に寄せる
+                if (c >= '\u30A1' && c <= '\u30F6') {
+                    c = (char)(c - 0x60);
+                }
+
+                sb.Append(c);
+            }
+
+            return sb.ToString();
+        }
+
+        private static string ToJaDate(string raw) {
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+            DateTime dt;
+            if (DateTime.TryParseExact(raw, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out dt)) {
+                return dt.ToString("yyyy年M月d日", CultureInfo.GetCultureInfo("ja-JP"));
+            }
+            return raw;
+        }
+
+        public class QuizWorkSuggestItem {
+            public string WorkKey { get; set; }
+            public string Title { get; set; }
+            public string Sub { get; set; }
+            public string PosterThumbUrl { get; set; }
+
+            // ソート用
+            public string NormTitle { get; set; }
+            public string NormQuery { get; set; }
         }
 
         // クイズ作成（MainWindow/MediaBrowserと同じ）
@@ -417,26 +648,42 @@ namespace Movie_AnimeQuizApp {
         private async Task LoadByQueryAsync(string query) {
             if (string.IsNullOrWhiteSpace(query)) return;
 
-            using (HttpClient http = new HttpClient()) {
-                string url =
-                    "https://api.themoviedb.org/3/search/multi"
-                    + "?api_key=" + Uri.EscapeDataString(_apiKey)
-                    + "&language=ja-JP"
-                    + "&query=" + Uri.EscapeDataString(query)
-                    + "&include_adult=false";
+            string url =
+                "https://api.themoviedb.org/3/search/multi"
+                + "?api_key=" + Uri.EscapeDataString(_apiKey)
+                + "&language=ja-JP"
+                + "&query=" + Uri.EscapeDataString(query)
+                + "&include_adult=false";
 
-                string json = await http.GetStringAsync(url);
-                JObject obj = JObject.Parse(json);
-                JArray results = obj["results"] as JArray;
+            string json = await _http.GetStringAsync(url);
+            JObject obj = JObject.Parse(json);
+            JArray results = obj["results"] as JArray;
 
-                if (results == null || results.Count == 0) {
-                    MessageBox.Show("作品が見つかりません。");
-                    return;
+            if (results == null || results.Count == 0) {
+                MessageBox.Show("作品が見つかりません。");
+                return;
+            }
+
+            int pickedId = 0;
+            string pickedType = "";
+
+            for (int i = 0; i < results.Count; i++) {
+                JToken r = results[i];
+                string mt = SafeStr(r["media_type"]);
+                if (mt != "movie" && mt != "tv") continue;
+
+                int id = r["id"] != null ? (int)r["id"] : 0;
+                if (id == 0) continue;
+
+                string poster = SafeStr(r["poster_path"]);
+                if (!string.IsNullOrWhiteSpace(poster)) {
+                    pickedId = id;
+                    pickedType = mt;
+                    break;
                 }
+            }
 
-                int pickedId = 0;
-                string pickedType = "";
-
+            if (pickedId == 0) {
                 for (int i = 0; i < results.Count; i++) {
                     JToken r = results[i];
                     string mt = SafeStr(r["media_type"]);
@@ -445,38 +692,21 @@ namespace Movie_AnimeQuizApp {
                     int id = r["id"] != null ? (int)r["id"] : 0;
                     if (id == 0) continue;
 
-                    string poster = SafeStr(r["poster_path"]);
-                    if (!string.IsNullOrWhiteSpace(poster)) {
-                        pickedId = id;
-                        pickedType = mt;
-                        break;
-                    }
+                    pickedId = id;
+                    pickedType = mt;
+                    break;
                 }
-
-                if (pickedId == 0) {
-                    for (int i = 0; i < results.Count; i++) {
-                        JToken r = results[i];
-                        string mt = SafeStr(r["media_type"]);
-                        if (mt != "movie" && mt != "tv") continue;
-
-                        int id = r["id"] != null ? (int)r["id"] : 0;
-                        if (id == 0) continue;
-
-                        pickedId = id;
-                        pickedType = mt;
-                        break;
-                    }
-                }
-
-                if (pickedId == 0) {
-                    MessageBox.Show("作品IDが取得できませんでした。");
-                    return;
-                }
-
-                await LoadByIdAsync(pickedId, pickedType);
             }
+
+            if (pickedId == 0) {
+                MessageBox.Show("作品IDが取得できませんでした。");
+                return;
+            }
+
+            await LoadByIdAsync(pickedId, pickedType);
         }
 
+        // ★表示を速くする：テキスト類を先に出して、プロバイダ/出演者/画像等は並列ロード
         private async Task LoadByIdAsync(int tmdbId, string mediaType) {
             if (tmdbId <= 0) return;
             if (string.IsNullOrWhiteSpace(mediaType)) mediaType = "movie";
@@ -484,100 +714,117 @@ namespace Movie_AnimeQuizApp {
             _tmdbId = tmdbId;
             _mediaType = mediaType;
 
-            using (HttpClient http = new HttpClient()) {
-                string detailUrl =
-                    "https://api.themoviedb.org/3/" + _mediaType + "/" + _tmdbId
-                    + "?api_key=" + Uri.EscapeDataString(_apiKey)
-                    + "&language=ja-JP";
+            string detailUrl =
+                "https://api.themoviedb.org/3/" + _mediaType + "/" + _tmdbId
+                + "?api_key=" + Uri.EscapeDataString(_apiKey)
+                + "&language=ja-JP";
 
-                string detailJson = await http.GetStringAsync(detailUrl);
-                JObject detailObj = JObject.Parse(detailJson);
+            string detailJson = await _http.GetStringAsync(detailUrl);
+            JObject detailObj = JObject.Parse(detailJson);
 
-                string title = "";
-                string overviewJa = SafeStr(detailObj["overview"]);
-                string posterPath = SafeStr(detailObj["poster_path"]);
-                string backdropPath = SafeStr(detailObj["backdrop_path"]);
-                double voteAverage = detailObj["vote_average"] != null ? (double)detailObj["vote_average"] : 0.0;
+            string title = "";
+            string overviewJa = SafeStr(detailObj["overview"]);
+            string posterPath = SafeStr(detailObj["poster_path"]);
+            string backdropPath = SafeStr(detailObj["backdrop_path"]);
+            double voteAverage = detailObj["vote_average"] != null ? (double)detailObj["vote_average"] : 0.0;
 
-                string dateRaw = "";
-                string dateLabel = "";
-                int runtime = 0;
+            string dateRaw = "";
+            string dateLabel = "";
+            int runtime = 0;
 
-                if (_mediaType == "movie") {
-                    title = SafeStr(detailObj["title"]);
-                    if (string.IsNullOrWhiteSpace(title)) title = SafeStr(detailObj["original_title"]);
-                    dateRaw = SafeStr(detailObj["release_date"]);
-                    dateLabel = "公開日";
-                    runtime = detailObj["runtime"] != null ? (int)detailObj["runtime"] : 0;
-                } else {
-                    title = SafeStr(detailObj["name"]);
-                    if (string.IsNullOrWhiteSpace(title)) title = SafeStr(detailObj["original_name"]);
-                    dateRaw = SafeStr(detailObj["first_air_date"]);
-                    dateLabel = "放送開始";
-                    JArray ert = detailObj["episode_run_time"] as JArray;
-                    if (ert != null && ert.Count > 0 && ert[0] != null && ert[0].Type == JTokenType.Integer)
-                        runtime = ert[0].Value<int>();
-                }
+            if (_mediaType == "movie") {
+                title = SafeStr(detailObj["title"]);
+                if (string.IsNullOrWhiteSpace(title)) title = SafeStr(detailObj["original_title"]);
+                dateRaw = SafeStr(detailObj["release_date"]);
+                dateLabel = "公開日";
+                runtime = detailObj["runtime"] != null ? (int)detailObj["runtime"] : 0;
+            } else {
+                title = SafeStr(detailObj["name"]);
+                if (string.IsNullOrWhiteSpace(title)) title = SafeStr(detailObj["original_name"]);
+                dateRaw = SafeStr(detailObj["first_air_date"]);
+                dateLabel = "放送開始";
+                JArray ert = detailObj["episode_run_time"] as JArray;
+                if (ert != null && ert.Count > 0 && ert[0] != null && ert[0].Type == JTokenType.Integer)
+                    runtime = ert[0].Value<int>();
+            }
 
-                if (string.IsNullOrWhiteSpace(title)) title = "(タイトル不明)";
+            if (string.IsNullOrWhiteSpace(title)) title = "(タイトル不明)";
 
-                List<string> genreNames = new List<string>();
-                JToken genres = detailObj["genres"];
-                if (genres != null) {
-                    foreach (JToken g in genres) {
-                        string name = SafeStr(g["name"]);
-                        if (!string.IsNullOrEmpty(name)) genreNames.Add(name);
-                    }
-                }
-
-                // 英語概要は日本語が無いときだけ
-                string overviewToShow = overviewJa;
-                if (string.IsNullOrWhiteSpace(overviewJa)) {
-                    string overviewEn = "";
-                    try {
-                        string detailUrlEn =
-                            "https://api.themoviedb.org/3/" + _mediaType + "/" + _tmdbId
-                            + "?api_key=" + Uri.EscapeDataString(_apiKey)
-                            + "&language=en-US";
-
-                        string detailJsonEn = await http.GetStringAsync(detailUrlEn);
-                        JObject detailObjEn = JObject.Parse(detailJsonEn);
-                        overviewEn = SafeStr(detailObjEn["overview"]);
-                    }
-                    catch { }
-
-                    overviewToShow = !string.IsNullOrWhiteSpace(overviewEn) ? overviewEn : "";
-                }
-
-                _trailerKey = await ResolveTrailerKeyAsync(http);
-
-                await LoadProvidersAsync(http);
-                await LoadCastAsync(http);
-
-                TitleText.Text = title;
-                OverviewText.Text = overviewToShow;
-
-                ReleaseDateText.Text = dateLabel + ": " + FormatJapaneseDateOnly(dateRaw);
-                GenresText.Text = genreNames.Count > 0 ? string.Join("・", genreNames) : "";
-                RuntimeText.Text = runtime > 0 ? (runtime.ToString() + "分") : "";
-
-                if (!string.IsNullOrEmpty(backdropPath)) {
-                    BackdropBrush.ImageSource = new BitmapImage(new Uri("https://image.tmdb.org/t/p/original" + backdropPath));
-                } else {
-                    BackdropBrush.ImageSource = null;
-                }
-
-                double scorePercent = Math.Max(0.0, Math.Min(100.0, voteAverage * 10.0));
-                UserScoreText.Text = Math.Round(scorePercent).ToString(CultureInfo.InvariantCulture) + "%";
-                UserScoreArc.Data = BuildArcGeometry(70.0, 70.0, 64.0, scorePercent);
-
-                if (!string.IsNullOrEmpty(posterPath)) {
-                    string posterUrl = "https://image.tmdb.org/t/p/w500" + posterPath;
-                    await SetImageByHttpAsync(http, PosterImage, posterUrl);
-                } else {
-                    PosterImage.Source = null;
+            List<string> genreNames = new List<string>();
+            JToken genres = detailObj["genres"];
+            if (genres != null) {
+                foreach (JToken g in genres) {
+                    string name = SafeStr(g["name"]);
+                    if (!string.IsNullOrEmpty(name)) genreNames.Add(name);
                 }
             }
+
+            // ===== ★先にUIへ反映（ここが表示高速化の本体）=====
+            TitleText.Text = title;
+
+            ReleaseDateText.Text = dateLabel + ": " + FormatJapaneseDateOnly(dateRaw);
+            GenresText.Text = genreNames.Count > 0 ? string.Join("・", genreNames) : "";
+            RuntimeText.Text = runtime > 0 ? (runtime.ToString() + "分") : "";
+
+            OverviewText.Text = overviewJa ?? "";
+
+            double scorePercent = Math.Max(0.0, Math.Min(100.0, voteAverage * 10.0));
+            UserScoreText.Text = Math.Round(scorePercent).ToString(CultureInfo.InvariantCulture) + "%";
+            UserScoreArc.Data = BuildArcGeometry(70.0, 70.0, 64.0, scorePercent);
+
+            if (!string.IsNullOrEmpty(backdropPath)) {
+                BackdropBrush.ImageSource = new BitmapImage(new Uri("https://image.tmdb.org/t/p/original" + backdropPath));
+            } else {
+                BackdropBrush.ImageSource = null;
+            }
+
+            // ===== 並列ロード開始（UIはもう表示される）=====
+            var trailerTask = ResolveTrailerKeyAsync(_http);
+
+            var providersTask = LoadProvidersAsync(_http);
+            var castTask = LoadCastAsync(_http);
+
+            Task posterTask = Task.CompletedTask;
+            if (!string.IsNullOrEmpty(posterPath)) {
+                string posterUrl = "https://image.tmdb.org/t/p/w500" + posterPath;
+                posterTask = SetImageByHttpAsync(_http, PosterImage, posterUrl);
+            } else {
+                PosterImage.Source = null;
+            }
+
+            Task overviewEnTask = Task.CompletedTask;
+            if (string.IsNullOrWhiteSpace(overviewJa)) {
+                overviewEnTask = LoadEnglishOverviewIfNeededAsync(_http);
+            }
+
+            await Task.WhenAll(providersTask, castTask, posterTask, overviewEnTask);
+
+            try {
+                _trailerKey = await trailerTask;
+            }
+            catch {
+                _trailerKey = "";
+            }
+        }
+
+        private async Task LoadEnglishOverviewIfNeededAsync(HttpClient http) {
+            try {
+                if (!string.IsNullOrWhiteSpace(OverviewText.Text)) return;
+
+                string detailUrlEn =
+                    "https://api.themoviedb.org/3/" + _mediaType + "/" + _tmdbId
+                    + "?api_key=" + Uri.EscapeDataString(_apiKey)
+                    + "&language=en-US";
+
+                string detailJsonEn = await http.GetStringAsync(detailUrlEn);
+                JObject detailObjEn = JObject.Parse(detailJsonEn);
+
+                string overviewEn = SafeStr(detailObjEn["overview"]);
+                if (!string.IsNullOrWhiteSpace(overviewEn) && string.IsNullOrWhiteSpace(OverviewText.Text)) {
+                    OverviewText.Text = overviewEn;
+                }
+            }
+            catch { }
         }
 
         // 予告：ボタン押下で表示（予告が無い作品は何もしない）

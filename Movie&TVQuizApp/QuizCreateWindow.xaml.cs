@@ -372,14 +372,13 @@ namespace Movie_AnimeQuizApp.Views {
         private async void Save_Click(object sender, RoutedEventArgs e) {
             await AppDb.InitAsync();
 
-            if (_selectedWork == null) { MessageBox.Show("作品を選択してください。"); return; }
+            if (_selectedWork == null) { return; }
 
             string createdBy = (CreatedByTextBox.Text ?? "").Trim();
             if (createdBy.Length == 0) createdBy = "anonymous";
 
             string question = (QuestionTextBox.Text ?? "").Trim();
             if (question.Length == 0 || question == QuestionPlaceholder) {
-                MessageBox.Show("問題文を入力してください。");
                 return;
             }
 
@@ -388,7 +387,6 @@ namespace Movie_AnimeQuizApp.Views {
             string c3 = (ChoiceTextBox3.Text ?? "").Trim();
 
             if (c1.Length == 0 || c2.Length == 0 || c3.Length == 0) {
-                MessageBox.Show("選択肢は3つすべて入力してください。");
                 return;
             }
 

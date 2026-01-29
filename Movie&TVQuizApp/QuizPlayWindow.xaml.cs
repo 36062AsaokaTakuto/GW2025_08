@@ -27,13 +27,11 @@ namespace Movie_AnimeQuizApp.Views {
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private int _remainingSeconds;
 
-        // ★制限時間 30秒
         private const int LimitSeconds = 30;
 
-        // ★二重遷移防止
         private bool _isClosingOrNavigating;
 
-        // ---- 画像高速化（並行ロード＋軽量化＋キャッシュ＋キャンセル）----
+        // ---- 画像高速化 ----
         private static readonly HttpClient _http = new HttpClient();
         private CancellationTokenSource _imageCts;
 
@@ -88,7 +86,7 @@ namespace Movie_AnimeQuizApp.Views {
         private async void QuizPlayWindow_Loaded(object sender, RoutedEventArgs e) {
             await AppDb.InitAsync();
 
-            // TLS / UA（環境差でTMDBが落ちるのを防ぐ）
+            // TLS / UA
             try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
             try {
                 if (_http.DefaultRequestHeaders.UserAgent.Count == 0) {
@@ -108,7 +106,7 @@ namespace Movie_AnimeQuizApp.Views {
 
             try { WorkTitleText.Text = _work.Title ?? ""; } catch { }
 
-            // ★背景画像：並行読み込み開始（awaitしない＝画面表示が止まらない）
+            // 背景画像：非同期
             try { BackgroundImage.Source = null; } catch { }
             try { _imageCts?.Cancel(); } catch { }
             _imageCts = new CancellationTokenSource();
@@ -124,6 +122,7 @@ namespace Movie_AnimeQuizApp.Views {
                 return;
             }
 
+            // ここは “次の問題” で継続するために残す（外側の画面から開始する時に StartNew する）
             if (QuizSession.Current == null || !QuizSession.Current.IsSameWork(_workKey)) {
                 QuizSession.StartNew(_workKey, _allQuizzes.Count);
             }
@@ -140,7 +139,6 @@ namespace Movie_AnimeQuizApp.Views {
 
             await LoadQuizAsync(quizIdToPlay);
 
-            // ★再度開かれたら必ず30秒からスタート
             StartTimer(LimitSeconds);
         }
 
@@ -252,7 +250,7 @@ namespace Movie_AnimeQuizApp.Views {
             try {
                 var win = new QuizResultWindow(_workKey, quizId, isCorrect);
 
-                // ★Ownerはホームを引き継ぐ（閉じるでホームに戻すため）
+                // Ownerはホームを引き継ぐ
                 win.Owner = this.Owner;
                 win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
@@ -263,9 +261,38 @@ namespace Movie_AnimeQuizApp.Views {
             Close();
         }
 
-        // -------------------------
-        // 作品画像（TMDB）高速化：キャッシュ＋軽量デコード＋キャンセル
-        // -------------------------
+        // ★追加：閉じる（必ず QuizPlayWindow を呼んだ画面へ戻す）
+        private void CloseBtn_Click(object sender, RoutedEventArgs e) {
+            if (_isClosingOrNavigating) return;
+
+            _isClosingOrNavigating = true;
+            StopTimer();
+            try { _imageCts?.Cancel(); } catch { }
+
+            try {
+                // 基本は Owner（呼び出し元）
+                var back = this.Owner;
+
+                // Owner が無い/死んでる場合の保険：MainWindow を探す
+                if (back == null && Application.Current != null) {
+                    foreach (Window w in Application.Current.Windows) {
+                        if (w == null) continue;
+                        if (w == this) continue;
+                        if (w.GetType().Name == "MainWindow") { back = w; break; }
+                    }
+                }
+
+                if (back != null) {
+                    try { back.Show(); } catch { }
+                    try { back.Activate(); } catch { }
+                }
+            }
+            catch { }
+
+            Close();
+        }
+
+        // ---- 背景画像 ----
         private async System.Threading.Tasks.Task LoadBackgroundAsync(Work w, CancellationToken token) {
             if (w == null) return;
 
@@ -281,7 +308,6 @@ namespace Movie_AnimeQuizApp.Views {
                     return;
                 }
 
-                // cancel対応で取得
                 byte[] bytes;
                 using (var req = new HttpRequestMessage(HttpMethod.Get, url))
                 using (var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token)) {
@@ -296,10 +322,7 @@ namespace Movie_AnimeQuizApp.Views {
                     bmp = new BitmapImage();
                     bmp.BeginInit();
                     bmp.CacheOption = BitmapCacheOption.OnLoad;
-
-                    // ★デコード軽量化（体感速度UP）
                     bmp.DecodePixelWidth = 1280;
-
                     bmp.StreamSource = ms;
                     bmp.EndInit();
                     bmp.Freeze();
@@ -312,7 +335,6 @@ namespace Movie_AnimeQuizApp.Views {
                 }
             }
             catch {
-                // 失敗してもアプリは継続
             }
         }
 

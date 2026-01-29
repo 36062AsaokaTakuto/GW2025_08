@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Quiz" Height="600" Width="1040"
         WindowStartupLocation="CenterScreen"
-        Background="#0E0F12" Foreground="#EDEDED" 
+        Background="#0E0F12" Foreground="#EDEDED"
         WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize">
 
     <Window.Resources>
@@ -21,6 +21,7 @@
             </Setter>
         </Style>
 
+        <!-- Choice用（既存そのまま：ホバー/押下が半透明） -->
         <Style x:Key="FlatButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#20222A"/>
             <Setter Property="Foreground" Value="#F3F3F3"/>
@@ -41,12 +42,43 @@
                                               RecognizesAccessKey="True"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <!-- ★ホバー/押下も半透明 -->
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#802A2D38"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#803A3E4D"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ★追加：閉じるボタン専用（QuizDeleteWindow と同じ色/ホバー/押下） -->
+        <Style x:Key="CloseFlatButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#20222A"/>
+            <Setter Property="Foreground" Value="#F3F3F3"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="16">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2A2D38"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3A3E4D"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
@@ -68,7 +100,6 @@
             <Setter Property="FontSize" Value="12"/>
         </Style>
 
-        <!-- ★QuizCreateWindowと同じ：ラベル -->
         <Style x:Key="LabelTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#EDEDED"/>
             <Setter Property="FontSize" Value="16"/>
@@ -80,7 +111,6 @@
             </Setter>
         </Style>
 
-        <!-- ★内側の枠：枠線を消す（BorderThickness=0） -->
         <Style x:Key="SmallFieldBorderStyle" TargetType="Border">
             <Setter Property="Background" Value="#3020222A"/>
             <Setter Property="CornerRadius" Value="12"/>
@@ -95,7 +125,6 @@
                Stretch="UniformToFill"
                Opacity="1.0"/>
 
-        <!-- 暗幕 -->
         <Border Background="#B30E0F12"/>
 
         <Border CornerRadius="22" Background="Transparent" Padding="18">
@@ -106,7 +135,7 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- 上：右上に制限時間 / 作品名は中央 -->
+                <!-- 上 -->
                 <Grid Grid.Row="0" Margin="0,0,0,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -145,7 +174,7 @@
                                VerticalAlignment="Center"/>
                 </Grid>
 
-                <!-- 中：問題文 -->
+                <!-- 中：問題 -->
                 <Border Grid.Row="1"
                         Style="{StaticResource CardBorderStyle}"
                         Margin="140,70,140,70"
@@ -162,80 +191,90 @@
                     </Grid>
                 </Border>
 
-                <!-- 下：選択肢（枠なし） -->
+                <!-- 下：Choice 3つ + 閉じる（ChoiceBtn3 の右側） -->
                 <Border Grid.Row="2" Margin="0,14,0,0" Background="Transparent">
-                    <UniformGrid Rows="1" Columns="3" HorizontalAlignment="Stretch">
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="260"/>
+                        </Grid.ColumnDefinitions>
 
-                        <!-- Choice 1：外側枠なし -->
-                        <Border Background="#6617181D"
+                        <!-- Choice 1 -->
+                        <Border Grid.Column="0"
+                                Background="#6617181D"
                                 CornerRadius="16"
                                 BorderThickness="0"
                                 Padding="10"
                                 Margin="0,0,10,0">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0">
-                                    <Button x:Name="ChoiceBtn1"
-                                            Click="Choice_Click"
-                                            Style="{StaticResource FlatButtonStyle}"
-                                            Background="Transparent"
-                                            Height="92"
-                                            FontSize="25"
-                                            Padding="18,14"/>
-                                </Border>
-                            </Grid>
+                            <Border Style="{StaticResource SmallFieldBorderStyle}">
+                                <Button x:Name="ChoiceBtn1"
+                                        Click="Choice_Click"
+                                        Style="{StaticResource FlatButtonStyle}"
+                                        Background="Transparent"
+                                        Height="92"
+                                        FontSize="25"
+                                        Padding="18,14"/>
+                            </Border>
                         </Border>
 
-                        <!-- Choice 2：外側枠なし -->
-                        <Border Background="#6617181D"
+                        <!-- Choice 2 -->
+                        <Border Grid.Column="1"
+                                Background="#6617181D"
                                 CornerRadius="16"
                                 BorderThickness="0"
                                 Padding="10"
                                 Margin="0,0,10,0">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0">
-                                    <Button x:Name="ChoiceBtn2"
-                                            Click="Choice_Click"
-                                            Style="{StaticResource FlatButtonStyle}"
-                                            Background="Transparent"
-                                            Height="92"
-                                            FontSize="25"
-                                            Padding="18,14"/>
-                                </Border>
-                            </Grid>
+                            <Border Style="{StaticResource SmallFieldBorderStyle}">
+                                <Button x:Name="ChoiceBtn2"
+                                        Click="Choice_Click"
+                                        Style="{StaticResource FlatButtonStyle}"
+                                        Background="Transparent"
+                                        Height="92"
+                                        FontSize="25"
+                                        Padding="18,14"/>
+                            </Border>
                         </Border>
 
-                        <!-- Choice 3：外側枠なし -->
-                        <Border Background="#6617181D"
+                        <!-- Choice 3 -->
+                        <Border Grid.Column="2"
+                                Background="#6617181D"
+                                CornerRadius="16"
+                                BorderThickness="0"
+                                Padding="10"
+                                Margin="0,0,10,0">
+                            <Border Style="{StaticResource SmallFieldBorderStyle}">
+                                <Button x:Name="ChoiceBtn3"
+                                        Click="Choice_Click"
+                                        Style="{StaticResource FlatButtonStyle}"
+                                        Background="Transparent"
+                                        Height="92"
+                                        FontSize="25"
+                                        Padding="18,14"/>
+                            </Border>
+                        </Border>
+
+                        <!-- ★閉じる（QuizDeleteWindowと同じ色） -->
+                        <Border Grid.Column="3"
+                                Background="#6617181D"
                                 CornerRadius="16"
                                 BorderThickness="0"
                                 Padding="10"
                                 Margin="0,0,0,0">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0">
-                                    <Button x:Name="ChoiceBtn3"
-                                            Click="Choice_Click"
-                                            Style="{StaticResource FlatButtonStyle}"
-                                            Background="Transparent"
-                                            Height="92"
-                                            FontSize="25"
-                                            Padding="18,14"/>
-                                </Border>
-                            </Grid>
+                            <Border Style="{StaticResource SmallFieldBorderStyle}">
+                                <Button x:Name="CloseBtn"
+                                        Content="閉じる"
+                                        Click="CloseBtn_Click"
+                                        Background="Transparent"
+                                        Style="{StaticResource CloseFlatButtonStyle}"
+                                        Height="92"
+                                        FontSize="25"
+                                        Padding="18,14"/>
+                            </Border>
                         </Border>
 
-                    </UniformGrid>
+                    </Grid>
                 </Border>
 
             </Grid>
