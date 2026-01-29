@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Movie_AnimeQuizApp.Share {
-    // 1行=1クイズ のJSON（NDJSON）でGit共有する
+    // 1行=1クイズ のJSON（NDJSON）でGit共有
     public static class QuizShare {
         private const string FolderName = "shared";
         private const string FileName = "quizzes.ndjson";
@@ -32,18 +32,18 @@ namespace Movie_AnimeQuizApp.Share {
 
         public class SharedQuizDto {
             public SharedWorkDto Work { get; set; }
-            public int Type { get; set; }           // 1固定
+            public int Type { get; set; }           // 1固定想定
             public string Question { get; set; }
             public string CreatedBy { get; set; }
             public string CreatedAt { get; set; }
             public List<SharedChoiceDto> Choices { get; set; }
         }
 
-        // リポジトリ直下/shared/quizzes.ndjson を見つける
+        // リポジトリ直下/shared/quizzes.ndjson を返す
         public static string GetShareFilePath() {
             string root = FindRepoRoot(AppDomain.CurrentDomain.BaseDirectory);
             if (string.IsNullOrWhiteSpace(root)) {
-                // .git が見つからない場合はプロジェクト配下に fallback（VS実行想定）
+                // fallback（最悪）
                 root = AppDomain.CurrentDomain.BaseDirectory;
             }
 
@@ -53,17 +53,18 @@ namespace Movie_AnimeQuizApp.Share {
             return Path.Combine(dir, FileName);
         }
 
+        // ★.git が「フォルダ」でも「ファイル」でもOK、.sln でもルート判定
         private static string FindRepoRoot(string startDir) {
             try {
-                var d = new DirectoryInfo(startDir);
+                DirectoryInfo d = new DirectoryInfo(startDir);
                 while (d != null) {
-                    // ★.git が「フォルダ」でも「ファイル」でもOKにする
-                    string gitPath = Path.Combine(d.FullName, ".git");
-                    if (Directory.Exists(gitPath) || File.Exists(gitPath))
+                    string git = Path.Combine(d.FullName, ".git");
+                    if (Directory.Exists(git) || File.Exists(git))
                         return d.FullName;
 
-                    // ★保険：.sln があればそこをルート扱い
-                    if (d.EnumerateFiles("*.sln").Any())
+                    // .sln があればそこをルート扱い
+                    FileInfo[] sln = d.GetFiles("*.sln");
+                    if (sln != null && sln.Length > 0)
                         return d.FullName;
 
                     d = d.Parent;
@@ -73,12 +74,11 @@ namespace Movie_AnimeQuizApp.Share {
             return "";
         }
 
-
-        // 保存時：共有ファイルへ追記（DB保存とは別。失敗してもDBは保存済み）
+        // 保存時：共有ファイルへ追記
         public static async Task AppendAsync(Work work, Quiz quiz, List<Choice> choices) {
             if (work == null || quiz == null || choices == null) return;
 
-            var dto = new SharedQuizDto {
+            SharedQuizDto dto = new SharedQuizDto {
                 Work = new SharedWorkDto {
                     WorkKey = work.WorkKey,
                     TmdbId = work.TmdbId,
@@ -102,33 +102,35 @@ namespace Movie_AnimeQuizApp.Share {
             string line = JsonConvert.SerializeObject(dto, Formatting.None);
             string path = GetShareFilePath();
 
-            // 1行追記（改行区切り）
-            using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read))
-            using (var sw = new StreamWriter(fs, new UTF8Encoding(false))) {
+            using (FileStream fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read))
+            using (StreamWriter sw = new StreamWriter(fs, new UTF8Encoding(false))) {
                 await sw.WriteLineAsync(line);
             }
         }
 
-        // 共有ファイル → DBへ取り込み（重複はスキップ）
-        public static async Task ImportToDbAsync() {
+        // 共有ファイル → DBへ取り込み（返り値=今回新規に取り込んだ件数）
+        public static async Task<int> ImportToDbAsync() {
             await AppDb.InitAsync();
 
             string path = GetShareFilePath();
-            if (!File.Exists(path)) return;
+            if (!File.Exists(path)) return 0;
 
             string[] lines;
             try {
                 lines = File.ReadAllLines(path, new UTF8Encoding(false));
             }
             catch {
-                return;
+                return 0;
             }
 
-            foreach (var raw in lines) {
-                var line = (raw ?? "").Trim();
+            int imported = 0;
+
+            for (int i = 0; i < lines.Length; i++) {
+                string raw = lines[i];
+                string line = (raw ?? "").Trim();
                 if (line.Length == 0) continue;
 
-                // Gitコンフリクト文字を無視（解決は人手）
+                // Gitコンフリクト記号行は無視
                 if (line.StartsWith("<<<<<<<") || line.StartsWith("=======") || line.StartsWith(">>>>>>>"))
                     continue;
 
@@ -145,9 +147,9 @@ namespace Movie_AnimeQuizApp.Share {
                 if (string.IsNullOrWhiteSpace(dto.Question)) continue;
                 if (dto.Choices == null || dto.Choices.Count == 0) continue;
 
-                // Work を先に入れる（相手PCにWorkが無いとQuizPlayWindowが開けない）
+                // Work を先に入れる
                 try {
-                    var w = new Work {
+                    Work w = new Work {
                         WorkKey = dto.Work.WorkKey,
                         TmdbId = dto.Work.TmdbId,
                         MediaType = dto.Work.MediaType,
@@ -161,13 +163,13 @@ namespace Movie_AnimeQuizApp.Share {
                 }
                 catch { }
 
-                // 既に同じクイズがDBにあるか判定（WorkKey + Type + Question + choices一致）
+                // 既に同一クイズがあるならスキップ
                 bool exists = await ExistsSameQuizAsync(dto);
                 if (exists) continue;
 
-                // Insert
+                // Insert Quiz + Choices
                 try {
-                    var quiz = new Quiz {
+                    Quiz quiz = new Quiz {
                         WorkKey = dto.Work.WorkKey,
                         Type = dto.Type,
                         Question = dto.Question,
@@ -181,31 +183,36 @@ namespace Movie_AnimeQuizApp.Share {
                         quiz.QuizId = await AppDb.Connection.ExecuteScalarAsync<int>("select last_insert_rowid()");
                     }
 
-                    foreach (var c in dto.Choices.Take(3)) {
+                    for (int c = 0; c < dto.Choices.Count && c < 3; c++) {
+                        SharedChoiceDto ch = dto.Choices[c];
                         await AppDb.Connection.InsertAsync(new Choice {
                             QuizId = quiz.QuizId,
-                            Text = c.Text ?? "",
-                            IsCorrect = c.IsCorrect
+                            Text = ch.Text ?? "",
+                            IsCorrect = ch.IsCorrect
                         });
                     }
+
+                    imported++;
                 }
                 catch {
                     // 1件失敗しても続行
                 }
             }
+
+            return imported;
         }
 
         private static async Task<bool> ExistsSameQuizAsync(SharedQuizDto dto) {
             try {
-                var candidates = await AppDb.Connection.Table<Quiz>()
+                List<Quiz> candidates = await AppDb.Connection.Table<Quiz>()
                     .Where(q => q.WorkKey == dto.Work.WorkKey && q.Type == dto.Type && q.Question == dto.Question)
                     .ToListAsync();
 
                 if (candidates == null || candidates.Count == 0) return false;
 
-                // choices一致チェック
-                foreach (var q in candidates) {
-                    var dbChoices = await AppDb.Connection.Table<Choice>()
+                for (int i = 0; i < candidates.Count; i++) {
+                    Quiz q = candidates[i];
+                    List<Choice> dbChoices = await AppDb.Connection.Table<Choice>()
                         .Where(c => c.QuizId == q.QuizId)
                         .ToListAsync();
 
@@ -221,9 +228,8 @@ namespace Movie_AnimeQuizApp.Share {
         }
 
         private static bool SameChoices(List<Choice> db, List<SharedChoiceDto> file) {
-            // 順番込みで比較（あなたのUIは3つ固定なのでこれで十分）
-            var a = db.OrderBy(x => x.ChoiceId).Take(3).ToList();
-            var b = file.Take(3).ToList();
+            List<Choice> a = db.OrderBy(x => x.ChoiceId).Take(3).ToList();
+            List<SharedChoiceDto> b = file.Take(3).ToList();
             if (a.Count != b.Count) return false;
 
             for (int i = 0; i < a.Count; i++) {

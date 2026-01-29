@@ -1,11 +1,8 @@
-﻿// QuizCreateWindow.xaml.cs（修正後・全体）
-// ※XAMLは変更なし（Save_ClickだけDB保存が確実になるように調整）
-// ※QuestionPlaceholder は「問題文を入力してください。」のプレースホルダー用
-using Movie_AnimeQuizApp.Data;
+﻿using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
+using Movie_AnimeQuizApp.Share;
 using Newtonsoft.Json.Linq;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -18,10 +15,10 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Collections.Generic;
 
 namespace Movie_AnimeQuizApp.Views {
     public partial class QuizCreateWindow : Window {
-
         private const string ApiKey = "0fa85086e0e7e8c979d1ff066b894bf5";
         private const string Placeholder = "クイズを作りたい作品を検索";
         private const string QuestionPlaceholder = "問題文を入力してください。";
@@ -48,9 +45,13 @@ namespace Movie_AnimeQuizApp.Views {
             WorkSearchTextBox.Text = Placeholder;
             WorkSearchTextBox.Foreground = Brushes.Gray;
 
-            // ★問題文プレースホルダー初期表示
+            // ★問題文プレースホルダー
             QuestionTextBox.Text = QuestionPlaceholder;
             QuestionTextBox.Foreground = Brushes.Gray;
+
+            // ★XAMLにイベントが付いていない場合でも動くようにコードで付与
+            QuestionTextBox.GotFocus += Question_GotFocus;
+            QuestionTextBox.LostFocus += Question_LostFocus;
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e) {
@@ -66,7 +67,6 @@ namespace Movie_AnimeQuizApp.Views {
             await AppDb.InitAsync();
 
             CreatedByTextBox.Text = Environment.UserName;
-            try { HintText.Text = "作品を検索して選択してください（タイプは中身=1固定）"; } catch { }
 
             ApplyWorkToUI(null);
 
@@ -92,7 +92,7 @@ namespace Movie_AnimeQuizApp.Views {
         }
 
         // -------------------------
-        // ★問題文：プレースホルダー
+        // 問題文：プレースホルダー
         // -------------------------
         private void Question_GotFocus(object sender, RoutedEventArgs e) {
             if (QuestionTextBox.Text == QuestionPlaceholder) {
@@ -129,19 +129,17 @@ namespace Movie_AnimeQuizApp.Views {
             try {
                 await Task.Delay(180, token);
 
-                var items = await SearchTmdbAsync(q, token);
+                TmdbSuggestItem[] items = await SearchTmdbAsync(q, token);
 
                 _workSuggestions.Clear();
-                foreach (var it in items) _workSuggestions.Add(it);
+                for (int i = 0; i < items.Length; i++) _workSuggestions.Add(items[i]);
 
                 WorkSuggestPopup.IsOpen = _workSuggestions.Count > 0;
             }
-            catch (OperationCanceledException) {
-            }
-            catch (Exception ex) {
+            catch (OperationCanceledException) { }
+            catch {
                 _workSuggestions.Clear();
                 WorkSuggestPopup.IsOpen = false;
-                try { HintText.Text = "TMDB検索エラー: " + ex.Message; } catch { }
             }
         }
 
@@ -153,11 +151,11 @@ namespace Movie_AnimeQuizApp.Views {
                 "&include_adult=false" +
                 "&query=" + Uri.EscapeDataString(query);
 
-            using (var req = new HttpRequestMessage(HttpMethod.Get, url))
-            using (var res = await _http.SendAsync(req, token)) {
+            using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, url))
+            using (HttpResponseMessage res = await _http.SendAsync(req, token)) {
                 if (!res.IsSuccessStatusCode) {
                     string body = await res.Content.ReadAsStringAsync();
-                    throw new InvalidOperationException("HTTP " + (int)res.StatusCode + " " + res.ReasonPhrase + " / " + body);
+                    throw new InvalidOperationException("HTTP " + (int)res.StatusCode + " / " + body);
                 }
 
                 string json = await res.Content.ReadAsStringAsync();
@@ -222,7 +220,7 @@ namespace Movie_AnimeQuizApp.Views {
 
         private void WorkSuggestList_PreviewKeyDown(object sender, KeyEventArgs e) {
             if (e.Key == Key.Enter) {
-                var it = WorkSuggestList.SelectedItem as TmdbSuggestItem;
+                TmdbSuggestItem it = WorkSuggestList.SelectedItem as TmdbSuggestItem;
                 if (it != null) SelectWork(it);
                 e.Handled = true;
                 return;
@@ -236,7 +234,7 @@ namespace Movie_AnimeQuizApp.Views {
         }
 
         private void WorkSuggestList_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) {
-            var it = WorkSuggestList.SelectedItem as TmdbSuggestItem;
+            TmdbSuggestItem it = WorkSuggestList.SelectedItem as TmdbSuggestItem;
             if (it != null) SelectWork(it);
         }
 
@@ -248,7 +246,7 @@ namespace Movie_AnimeQuizApp.Views {
             CancellationToken token = _searchCts.Token;
 
             try {
-                var work = await FetchWorkDetailsFromTmdbAsync(it.MediaType, it.TmdbId, token);
+                Work work = await FetchWorkDetailsFromTmdbAsync(it.MediaType, it.TmdbId, token);
                 await AppDb.Connection.InsertOrReplaceAsync(work);
 
                 _selectedWork = work;
@@ -262,13 +260,9 @@ namespace Movie_AnimeQuizApp.Views {
                 if (WorkSuggestPopup != null) WorkSuggestPopup.IsOpen = false;
 
                 ApplyWorkToUI(work);
-                try { HintText.Text = ""; } catch { }
             }
-            catch (OperationCanceledException) {
-            }
-            catch (Exception ex) {
-                try { HintText.Text = "詳細取得エラー: " + ex.Message; } catch { }
-            }
+            catch (OperationCanceledException) { }
+            catch { }
         }
 
         private async Task<Work> FetchWorkDetailsFromTmdbAsync(string mediaType, int tmdbId, CancellationToken token) {
@@ -279,11 +273,11 @@ namespace Movie_AnimeQuizApp.Views {
                 "?api_key=" + ApiKey +
                 "&language=ja-JP";
 
-            using (var req = new HttpRequestMessage(HttpMethod.Get, url))
-            using (var res = await _http.SendAsync(req, token)) {
+            using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, url))
+            using (HttpResponseMessage res = await _http.SendAsync(req, token)) {
                 if (!res.IsSuccessStatusCode) {
                     string body = await res.Content.ReadAsStringAsync();
-                    throw new InvalidOperationException("HTTP " + (int)res.StatusCode + " " + res.ReasonPhrase + " / " + body);
+                    throw new InvalidOperationException("HTTP " + (int)res.StatusCode + " / " + body);
                 }
 
                 string json = await res.Content.ReadAsStringAsync();
@@ -316,7 +310,6 @@ namespace Movie_AnimeQuizApp.Views {
             }
 
             try { WorkTitleText.Text = w.Title ?? ""; } catch { }
-
             try { BackdropImage.Source = null; } catch { }
 
             if (_imageCts != null) _imageCts.Cancel();
@@ -327,6 +320,7 @@ namespace Movie_AnimeQuizApp.Views {
             string backdropUrl = BuildTmdbUrl(TmdbBackdropBase, w.BackdropPath);
 
             try {
+
                 string bgUrl = !string.IsNullOrWhiteSpace(backdropUrl)
                     ? backdropUrl
                     : BuildTmdbUrl(TmdbBackdropBase, w.PosterPath);
@@ -335,11 +329,8 @@ namespace Movie_AnimeQuizApp.Views {
                     BackdropImage.Source = await DownloadBitmapAsync(bgUrl, token);
                 }
             }
-            catch (OperationCanceledException) {
-            }
-            catch (Exception ex) {
-                try { HintText.Text = "画像読み込み失敗: " + ex.Message; } catch { }
-            }
+            catch (OperationCanceledException) { }
+            catch { }
         }
 
         private string BuildTmdbUrl(string baseUrl, string path) {
@@ -349,14 +340,14 @@ namespace Movie_AnimeQuizApp.Views {
         }
 
         private async Task<BitmapImage> DownloadBitmapAsync(string url, CancellationToken token) {
-            using (var req = new HttpRequestMessage(HttpMethod.Get, url))
-            using (var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token)) {
+            using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, url))
+            using (HttpResponseMessage res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token)) {
                 res.EnsureSuccessStatusCode();
 
                 byte[] bytes = await res.Content.ReadAsByteArrayAsync();
 
-                var bmp = new BitmapImage();
-                using (var ms = new MemoryStream(bytes)) {
+                BitmapImage bmp = new BitmapImage();
+                using (MemoryStream ms = new MemoryStream(bytes)) {
                     bmp.BeginInit();
                     bmp.CacheOption = BitmapCacheOption.OnLoad;
                     bmp.StreamSource = ms;
@@ -376,7 +367,7 @@ namespace Movie_AnimeQuizApp.Views {
         }
 
         // -------------------------
-        // ★保存：Quiz / Choice を確実にDBへ
+        // ★保存：DB保存 + 共有ファイル追記
         // -------------------------
         private async void Save_Click(object sender, RoutedEventArgs e) {
             await AppDb.InitAsync();
@@ -411,11 +402,10 @@ namespace Movie_AnimeQuizApp.Views {
             string now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
             try {
-                // 念のため Work をDBへ（既にあってもOK）
                 await AppDb.Connection.InsertOrReplaceAsync(_selectedWork);
 
-                var quiz = new Quiz {
-                    WorkKey = _selectedWork.WorkKey, // ★QuizPlayWindowはこれで絞る
+                Quiz quiz = new Quiz {
+                    WorkKey = _selectedWork.WorkKey,
                     Type = 1,
                     Question = question,
                     CreatedBy = createdBy,
@@ -424,17 +414,20 @@ namespace Movie_AnimeQuizApp.Views {
 
                 await AppDb.Connection.InsertAsync(quiz);
 
-                // ★環境差で QuizId が取れない保険
                 if (quiz.QuizId <= 0) {
                     quiz.QuizId = await AppDb.Connection.ExecuteScalarAsync<int>("select last_insert_rowid()");
                 }
 
-                await AppDb.Connection.InsertAsync(new Choice { QuizId = quiz.QuizId, Text = c1, IsCorrect = (correctIndex == 1) });
-                await AppDb.Connection.InsertAsync(new Choice { QuizId = quiz.QuizId, Text = c2, IsCorrect = (correctIndex == 2) });
-                await AppDb.Connection.InsertAsync(new Choice { QuizId = quiz.QuizId, Text = c3, IsCorrect = (correctIndex == 3) });
+                Choice ch1 = new Choice { QuizId = quiz.QuizId, Text = c1, IsCorrect = (correctIndex == 1) };
+                Choice ch2 = new Choice { QuizId = quiz.QuizId, Text = c2, IsCorrect = (correctIndex == 2) };
+                Choice ch3 = new Choice { QuizId = quiz.QuizId, Text = c3, IsCorrect = (correctIndex == 3) };
 
-                MessageBox.Show("保存しました。");
-                await Movie_AnimeQuizApp.Share.QuizShare.AppendAsync(
+                await AppDb.Connection.InsertAsync(ch1);
+                await AppDb.Connection.InsertAsync(ch2);
+                await AppDb.Connection.InsertAsync(ch3);
+
+                // ★共有ファイルにも追記（相手に届く）
+                await QuizShare.AppendAsync(
                     _selectedWork,
                     quiz,
                     new List<Choice> {
@@ -444,6 +437,7 @@ namespace Movie_AnimeQuizApp.Views {
                     }
                 );
 
+                MessageBox.Show("保存しました。");
                 Close();
             }
             catch (Exception ex) {
@@ -454,13 +448,13 @@ namespace Movie_AnimeQuizApp.Views {
         private void Cancel_Click(object sender, RoutedEventArgs e) {
             Close();
         }
-    }
 
-    public class TmdbSuggestItem {
-        public string MediaType { get; set; }
-        public int TmdbId { get; set; }
-        public string Title { get; set; }
-        public string PosterThumbUrl { get; set; }
-        public string Sub { get; set; }
+        public class TmdbSuggestItem {
+            public string MediaType { get; set; }
+            public int TmdbId { get; set; }
+            public string Title { get; set; }
+            public string PosterThumbUrl { get; set; }
+            public string Sub { get; set; }
+        }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Movie_AnimeQuizApp.QuizRuntime;
+using Movie_AnimeQuizApp.Share;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -167,6 +168,9 @@ namespace Movie_AnimeQuizApp.Views {
             if (QuizSession.Current == null) { NextBtn.IsEnabled = false; return; }
             if (!QuizSession.Current.IsSameWork(_workKey)) { NextBtn.IsEnabled = false; return; }
 
+            // ★追加：次の問題を探す前に共有ファイル→DB取り込み
+            try { await QuizShare.ImportToDbAsync(); } catch { }
+
             // ★念のため毎回最新に（新規登録が途中で増えても追従）
             try {
                 _allQuizzes = await AppDb.Connection.Table<Quiz>()
@@ -191,13 +195,13 @@ namespace Movie_AnimeQuizApp.Views {
             var win = new QuizPlayWindow(_workKey, nextQuizId);
             win.Owner = this.Owner;
 
-            // ★最大化で表示（前の指示どおり）
             win.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             win.WindowState = WindowState.Maximized;
 
             win.Show();
             Close();
         }
+
 
         private void CloseBtn_Click(object sender, RoutedEventArgs e) {
             // ★閉じるボタンで正答率リセット（セッション破棄）

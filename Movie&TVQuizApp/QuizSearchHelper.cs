@@ -1,6 +1,7 @@
 ﻿using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Movie_AnimeQuizApp.QuizRuntime;   // ★QuizSession の場所
+using Movie_AnimeQuizApp.Share;
 using System;
 using System.Threading.Tasks;
 using System.Windows;
@@ -19,6 +20,9 @@ namespace Movie_AnimeQuizApp.Views {
 
             await AppDb.InitAsync();
 
+            // ★追加：DB検索より前に共有ファイル→DB取り込み
+            try { await QuizShare.ImportToDbAsync(); } catch { }
+
             // ★完全一致のみ
             Work work = await AppDb.Connection.Table<Work>()
                 .Where(w => w.Title == title)
@@ -33,11 +37,8 @@ namespace Movie_AnimeQuizApp.Views {
 
             if (total <= 0) return;
 
-            // ★このクリックで「新しいセッション開始」
-            //   次に QuizSearchHit を押すまで、Next では同じQuizを引かない
             QuizSession.StartNew(work.WorkKey, total);
 
-            // ★最初の1問をセッションから選ぶ（重複なし）
             var allQuizzes = await AppDb.Connection.Table<Quiz>()
                 .Where(q => q.WorkKey == work.WorkKey)
                 .ToListAsync();
@@ -45,13 +46,13 @@ namespace Movie_AnimeQuizApp.Views {
             int firstQuizId = QuizSession.Current.PickNextQuizIdAndMark(allQuizzes);
             if (firstQuizId <= 0) return;
 
-            // ★QuizPlayWindow は (workKey, quizId) で開く（あなたのエラー対策）
             var win = new QuizPlayWindow(work.WorkKey, firstQuizId);
 
             win.Owner = host;
             win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             win.Show();
         }
+
 
         private static string GetQueryText(Window host) {
             object obj = host.FindName("QuizSearchPanel");

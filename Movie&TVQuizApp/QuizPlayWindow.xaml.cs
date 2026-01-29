@@ -1,13 +1,10 @@
 ﻿using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Movie_AnimeQuizApp.QuizRuntime;
+using Movie_AnimeQuizApp.Share;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -26,16 +23,8 @@ namespace Movie_AnimeQuizApp.Views {
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private int _remainingSeconds;
 
-        // ★制限時間：30秒
-        private const int LimitSeconds = 30;
-
+        private const int LimitSeconds = 60;
         private const string TmdbPosterBase = "https://image.tmdb.org/t/p/w342";
-        private const string TmdbBackdropBase = "https://image.tmdb.org/t/p/w780";
-
-        private static readonly HttpClient _http = new HttpClient();
-
-        // ★「再度開かれた時に最初から」を安全にするため
-        private bool _isReady; // 問題が読み込めた後のみタイマー再開する
 
         public QuizPlayWindow(QuizSession session) {
             InitializeComponent();
@@ -44,13 +33,6 @@ namespace Movie_AnimeQuizApp.Views {
             _startQuizId = 0;
 
             Loaded += QuizPlayWindow_Loaded;
-
-            // ★閉じたらタイマー停止
-            Closing += QuizPlayWindow_Closing;
-            Closed += QuizPlayWindow_Closed;
-
-            // ★Hide→Show等でも最初から再スタート
-            IsVisibleChanged += QuizPlayWindow_IsVisibleChanged;
 
             _timer.Interval = TimeSpan.FromSeconds(1);
             _timer.Tick += Timer_Tick;
@@ -64,23 +46,17 @@ namespace Movie_AnimeQuizApp.Views {
 
             Loaded += QuizPlayWindow_Loaded;
 
-            // ★閉じたらタイマー停止
-            Closing += QuizPlayWindow_Closing;
-            Closed += QuizPlayWindow_Closed;
-
-            // ★Hide→Show等でも最初から再スタート
-            IsVisibleChanged += QuizPlayWindow_IsVisibleChanged;
-
             _timer.Interval = TimeSpan.FromSeconds(1);
             _timer.Tick += Timer_Tick;
         }
 
         private async void QuizPlayWindow_Loaded(object sender, RoutedEventArgs e) {
             await AppDb.InitAsync();
-            MessageBox.Show(Movie_AnimeQuizApp.Share.QuizShare.GetShareFilePath());
-            try { await Movie_AnimeQuizApp.Share.QuizShare.ImportToDbAsync(); } catch { }
 
+            // ★最重要：DB検索より前に共有クイズを取り込む
+            try { await QuizShare.ImportToDbAsync(); } catch { }
 
+            // Work 取得
             _work = await AppDb.Connection.Table<Work>()
                 .Where(w => w.WorkKey == _workKey)
                 .FirstOrDefaultAsync();
@@ -90,13 +66,11 @@ namespace Movie_AnimeQuizApp.Views {
                 return;
             }
 
+            // タイトル/ポスター
             try { WorkTitleText.Text = _work.Title ?? ""; } catch { }
+            SetPosterImage(ToPosterUrl(_work.PosterPath));
 
-            // ★背景：TMDB（Backdrop優先→Poster）
-            string bgUrl = ToBackdropUrl(_work.BackdropPath);
-            if (string.IsNullOrWhiteSpace(bgUrl)) bgUrl = ToPosterUrl(_work.PosterPath);
-            await SetBackgroundImageAsync(bgUrl);
-
+            // 同作品のクイズ全件
             _allQuizzes = await AppDb.Connection.Table<Data.Entities.Quiz>()
                 .Where(q => q.WorkKey == _workKey)
                 .ToListAsync();
@@ -123,46 +97,24 @@ namespace Movie_AnimeQuizApp.Views {
 
             await LoadQuizAsync(quizIdToPlay);
 
-            // ★ここまで来たらタイマー再開OK
-            _isReady = true;
-
-            // ★最初からカウント開始
-            RestartTimerFromBeginning();
+            StartTimer(LimitSeconds);
         }
 
-        private void QuizPlayWindow_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e) {
-            // ★再表示されたら最初から数えなおす
-            if (this.IsVisible) {
-                if (_isReady) {
-                    RestartTimerFromBeginning();
-                }
-            } else {
-                // ★非表示/閉じる方向なら停止
-                StopTimer();
-            }
+        private string ToPosterUrl(string posterPathOrUrl) {
+            if (string.IsNullOrWhiteSpace(posterPathOrUrl)) return "";
+            if (posterPathOrUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return posterPathOrUrl;
+            if (posterPathOrUrl.StartsWith("/")) return TmdbPosterBase + posterPathOrUrl;
+            return posterPathOrUrl;
         }
 
-        private void QuizPlayWindow_Closing(object sender, CancelEventArgs e) {
-            // ★閉じたらタイマー停止
-            StopTimer();
-        }
-
-        private void QuizPlayWindow_Closed(object sender, EventArgs e) {
-            // ★完全に閉じた後も念のため
-            StopTimer();
-            _timer.Tick -= Timer_Tick;
-            _isReady = false;
-        }
-
-        private void RestartTimerFromBeginning() {
-            StopTimer();
-            _remainingSeconds = LimitSeconds;
+        private void StartTimer(int seconds) {
+            _remainingSeconds = seconds;
             try { TimerText.Text = _remainingSeconds.ToString(); } catch { }
             _timer.Start();
         }
 
         private void StopTimer() {
-            try { _timer.Stop(); } catch { }
+            _timer.Stop();
         }
 
         private void Timer_Tick(object sender, EventArgs e) {
@@ -241,7 +193,7 @@ namespace Movie_AnimeQuizApp.Views {
 
         private async System.Threading.Tasks.Task SavePlayAsync(int quizId, bool isCorrect) {
             try {
-                var play = new Play {
+                Play play = new Play {
                     QuizId = quizId,
                     User = "default",
                     IsCorrect = isCorrect,
@@ -249,76 +201,32 @@ namespace Movie_AnimeQuizApp.Views {
                 };
                 await AppDb.Connection.InsertAsync(play);
             }
-            catch {
-            }
+            catch { }
         }
 
         private void OpenResultWindow(bool isCorrect, int quizId) {
             try {
-                var win = new QuizResultWindow(_workKey, quizId, isCorrect);
-
-                // ★全画面（最大化）
-                win.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-                win.WindowState = WindowState.Maximized;
-
+                QuizResultWindow win = new QuizResultWindow(_workKey, quizId, isCorrect);
+                win.Owner = this.Owner;
+                win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
                 win.Show();
             }
-            catch {
-            }
+            catch { }
 
             Close();
         }
 
-
-        private string ToPosterUrl(string posterPathOrUrl) {
-            if (string.IsNullOrWhiteSpace(posterPathOrUrl)) return "";
-            if (posterPathOrUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return posterPathOrUrl;
-
-            // "/xxx.jpg" でも "xxx.jpg" でもOK
-            if (!posterPathOrUrl.StartsWith("/")) posterPathOrUrl = "/" + posterPathOrUrl;
-            return TmdbPosterBase + posterPathOrUrl;
-        }
-
-        private string ToBackdropUrl(string backdropPathOrUrl) {
-            if (string.IsNullOrWhiteSpace(backdropPathOrUrl)) return "";
-            if (backdropPathOrUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return backdropPathOrUrl;
-
-            // "/xxx.jpg" でも "xxx.jpg" でもOK
-            if (!backdropPathOrUrl.StartsWith("/")) backdropPathOrUrl = "/" + backdropPathOrUrl;
-            return TmdbBackdropBase + backdropPathOrUrl;
-        }
-
-        // ★背景が出ない対策：HttpClientで取得→StreamSourceで表示（安定）
-        private async System.Threading.Tasks.Task SetBackgroundImageAsync(string imageUrl) {
-            if (string.IsNullOrWhiteSpace(imageUrl)) {
-                try { BackgroundImage.Source = null; } catch { }
-                return;
-            }
+        private void SetPosterImage(string posterPathOrUrl) {
+            if (string.IsNullOrWhiteSpace(posterPathOrUrl)) return;
 
             try {
-                // TLS 1.2 対応（古い環境対策）
-                try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
-
-                // 保険：User-Agent
-                if (_http.DefaultRequestHeaders.UserAgent.Count == 0) {
-                    _http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
-                }
-
-                byte[] bytes = await _http.GetByteArrayAsync(imageUrl);
-
-                using (var ms = new MemoryStream(bytes)) {
-                    var bmp = new BitmapImage();
-                    bmp.BeginInit();
-                    bmp.CacheOption = BitmapCacheOption.OnLoad;
-                    bmp.StreamSource = ms;
-                    bmp.EndInit();
-                    bmp.Freeze();
-                    BackgroundImage.Source = bmp;
-                }
+                BitmapImage bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri(posterPathOrUrl, UriKind.RelativeOrAbsolute);
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
             }
-            catch {
-                try { BackgroundImage.Source = null; } catch { }
-            }
+            catch { }
         }
     }
 }

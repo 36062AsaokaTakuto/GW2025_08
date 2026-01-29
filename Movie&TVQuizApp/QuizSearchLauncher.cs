@@ -1,10 +1,11 @@
-﻿using System;
+﻿using Movie_AnimeQuizApp.Data;
+using Movie_AnimeQuizApp.Data.Entities;
+using Movie_AnimeQuizApp.Share;
+using Movie_AnimeQuizApp.Views;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
-using Movie_AnimeQuizApp.Data;
-using Movie_AnimeQuizApp.Data.Entities;
-using Movie_AnimeQuizApp.Views;
 using QuizEntity = Movie_AnimeQuizApp.Data.Entities.Quiz;
 
 namespace Movie_AnimeQuizApp.QuizRuntime {
@@ -18,6 +19,9 @@ namespace Movie_AnimeQuizApp.QuizRuntime {
 
             await AppDb.InitAsync();
 
+            // ★追加：DB検索より前に共有ファイル→DB取り込み
+            try { await QuizShare.ImportToDbAsync(); } catch { }
+
             // ★完全一致
             Work work = await AppDb.Connection.Table<Work>()
                 .Where(w => w.Title == title)
@@ -30,7 +34,9 @@ namespace Movie_AnimeQuizApp.QuizRuntime {
 
             string workKey = work.WorkKey;
 
-            List<QuizEntity> quizzes = await AppDb.Connection.Table<QuizEntity>()
+            // ※ここが QuizEntity だと共有取り込み先のテーブルとズレる可能性がある
+            // 共有取り込みは Data.Entities.Quiz に入るので、原則 Quiz を使う
+            List<Quiz> quizzes = await AppDb.Connection.Table<Quiz>()
                 .Where(q => q.WorkKey == workKey)
                 .ToListAsync();
 
@@ -39,10 +45,8 @@ namespace Movie_AnimeQuizApp.QuizRuntime {
                 return;
             }
 
-            // ★QuizSearchHit クリックごとに新セッション開始 → 分母固定
             QuizSession.StartNew(workKey, quizzes.Count);
 
-            // ★1問目を引いて「出題済み」にする（以後 Next で重複しない）
             int firstQuizId = QuizSession.Current.PickNextQuizIdAndMark(quizzes);
             if (firstQuizId <= 0) return;
 
@@ -50,5 +54,6 @@ namespace Movie_AnimeQuizApp.QuizRuntime {
             if (owner != null) win.Owner = owner;
             win.Show();
         }
+
     }
 }
