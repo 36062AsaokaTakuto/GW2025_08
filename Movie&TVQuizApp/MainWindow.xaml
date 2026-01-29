@@ -1,4 +1,4 @@
-﻿<!-- MainWindow.xaml（★クイズ検索に「作ってあるクイズ」候補リスト追加・全体） -->
+﻿<!-- MainWindow.xaml（クイズ検索ボックスの候補を復活 + 電源ボタンは残す） -->
 <Window x:Class="Movie_AnimeQuizApp.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -6,7 +6,7 @@
         WindowState="Maximized"
         Background="Black"
         PreviewMouseDown="Window_PreviewMouseDown"
-        >
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize">
 
     <Window.Resources>
 
@@ -95,16 +95,46 @@
                         <ColumnDefinition/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- 映画 -->
-                    <Border Grid.Column="0"
-                            Style="{StaticResource HeaderHitStyle}"
-                            MouseEnter="MovieHeader_MouseEnter"
-                            MouseLeave="MovieHeader_MouseLeave">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="映画" Foreground="White" FontSize="24"/>
-                            <TextBlock Text=" ▾" Foreground="#E50914" FontSize="22" Margin="6,0,0,0"/>
-                        </StackPanel>
+                    <!-- 映画（左端に電源ボタン）※ここだけ差し替え -->
+                    <!-- 映画（電源ボタンにホバーしてもメニューが出ないように修正）※このブロックだけ置き換え -->
+                    <Border Grid.Column="0" Background="Transparent" Padding="8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- ★左端：電源（ここにホバーしても映画メニューは出ない） -->
+                            <Button x:Name="PowerButton"
+                                Grid.Column="0"
+                                Width="34" Height="34"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Cursor="Hand"
+                                Click="Power_Click"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Margin="20,0,0,0">
+                                <TextBlock Text="⏻" Foreground="White" FontSize="30" VerticalAlignment="Center"/>
+                            </Button>
+
+                            <!-- ★映画エリア（ここにホバーした時だけメニュー表示） -->
+                            <Border Grid.Column="1"
+                                Style="{StaticResource HeaderHitStyle}"
+                                Padding="0"
+                                MouseEnter="MovieHeader_MouseEnter"
+                                MouseLeave="MovieHeader_MouseLeave">
+                                <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                                    <TextBlock Text="映画" Foreground="White" FontSize="24"/>
+                                    <TextBlock Text=" ▾" Foreground="#E50914" FontSize="22" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
                     </Border>
+
+
 
                     <!-- テレビ番組 -->
                     <Border Grid.Column="1"
@@ -179,118 +209,115 @@
                         <!-- 上：クイズ回答/クイズ作成 -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <Button x:Name="QuizSearchHit"
-                                Style="{StaticResource MenuButtonStyle}"
-                                Content="クイズ回答"
-                                Width="140" Margin="6,0"
-                                Click="QuizSearchHit_Click"
-                                MouseEnter="QuizSearchHit_MouseEnter"
-                                MouseLeave="QuizSearchHit_MouseLeave"/>
+                                    Style="{StaticResource MenuButtonStyle}"
+                                    Content="クイズ回答"
+                                    Width="140" Margin="6,0"
+                                    Click="QuizSearchHit_Click"
+                                    MouseEnter="QuizSearchHit_MouseEnter"
+                                    MouseLeave="QuizSearchHit_MouseLeave"/>
 
                             <Button Style="{StaticResource MenuButtonStyle}"
-                                Content="クイズを作成"
-                                Width="140" Margin="6,0"
-                                Click="QuizCreate_Click"/>
+                                    Content="クイズを作成"
+                                    Width="140" Margin="6,0"
+                                    Click="QuizCreate_Click"/>
 
-                            <!-- ★追加：クイズ削除 -->
                             <Button Style="{StaticResource MenuButtonStyle}"
-                                Content="クイズ削除"
-                                Width="140" Margin="6,0"
-                                Click="QuizDelete_Click"/>
+                                    Content="クイズ削除"
+                                    Width="140" Margin="6,0"
+                                    Click="QuizDelete_Click"/>
                         </StackPanel>
 
-                        <!-- 下：クイズ検索ボックス（入力中は消えない） -->
+                        <!-- 下：クイズ検索ボックス -->
                         <Border x:Name="QuizSearchPanel"
                                 Visibility="Collapsed"
                                 Margin="10,10,10,0"
                                 Background="Transparent"
                                 MouseEnter="QuizSearchPanel_MouseEnter"
                                 MouseLeave="QuizSearchPanel_MouseLeave">
+                            <Border Background="#66000000"
+                                    BorderBrush="#808080"
+                                    BorderThickness="2"
+                                    CornerRadius="10"
+                                    Padding="10"
+                                    Width="340">
 
-                            <!-- ★ここだけ修正：検索BOXの下に候補リストを追加 -->
-                            <StackPanel Width="340">
-
-                                <!-- 検索BOX -->
-                                <Border Background="#66000000"
-                                        BorderBrush="#808080"
-                                        BorderThickness="2"
-                                        CornerRadius="10"
-                                        Padding="10"
-                                        Width="340">
-
-                                    <!-- ★TextBoxにプレースホルダー文字を入れず、上にTextBlockを重ねる -->
-                                    <Grid>
-                                        <TextBox x:Name="QuizSearchTextBox"
-                                                 FontSize="16"
-                                                 Background="Transparent"
-                                                 BorderThickness="0"
-                                                 Foreground="White"
-                                                 VerticalContentAlignment="Center"
-                                                 CaretBrush="White"
-                                                 Cursor="IBeam"
-                                                 GotFocus="QuizSearch_GotFocus"
-                                                 LostFocus="QuizSearch_LostFocus"
-                                                 PreviewKeyDown="QuizSearch_PreviewKeyDown"
-                                                 PreviewMouseLeftButtonDown="QuizSearch_PreviewMouseLeftButtonDown"
-                                                 TextChanged="QuizSearch_TextChanged"/>
-
-                                        <!-- ★未入力のときだけ表示するプレースホルダー -->
-                                        <TextBlock x:Name="QuizSearchWatermark"
-                                                   Text="クイズしたい作品名を入力"
-                                                   Foreground="Gray"
-                                                   FontSize="16"
-                                                   Margin="2,0,0,0"
-                                                   VerticalAlignment="Center"
-                                                   IsHitTestVisible="False"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- ★追加：作ってあるクイズ候補（スクロールバー非表示） -->
-                                <Border x:Name="QuizWorkSuggestBorder"
-                                        Visibility="Collapsed"
-                                        Margin="0,8,0,0"
-                                        Width="340"
-                                        Background="#DD111111"
-                                        CornerRadius="10"
-                                        BorderBrush="#2A2A2A"
-                                        BorderThickness="1">
-                                    <ListBox x:Name="QuizWorkSuggestList"
+                                <Grid>
+                                    <TextBox x:Name="QuizSearchTextBox"
+                                             FontSize="16"
                                              Background="Transparent"
                                              BorderThickness="0"
                                              Foreground="White"
-                                             SelectionMode="Single"
-                                             MaxHeight="260"
-                                             ScrollViewer.VerticalScrollBarVisibility="Hidden"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                                             MouseLeftButtonUp="QuizWorkSuggestList_MouseLeftButtonUp">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Margin="10">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="50"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
+                                             VerticalContentAlignment="Center"
+                                             CaretBrush="White"
+                                             Cursor="IBeam"
+                                             GotFocus="QuizSearch_GotFocus"
+                                             LostFocus="QuizSearch_LostFocus"
+                                             PreviewKeyDown="QuizSearch_PreviewKeyDown"
+                                             PreviewMouseLeftButtonDown="QuizSearch_PreviewMouseLeftButtonDown"
+                                             TextChanged="QuizSearch_TextChanged"/>
 
-                                                    <Border Width="46" Height="68" CornerRadius="6" ClipToBounds="True" Background="#222">
-                                                        <Image Stretch="UniformToFill" Source="{Binding PosterThumbUrl}"/>
-                                                    </Border>
+                                    <TextBlock x:Name="QuizSearchWatermark"
+                                               Text="クイズしたい作品名を入力"
+                                               Foreground="Gray"
+                                               FontSize="16"
+                                               Margin="2,0,0,0"
+                                               VerticalAlignment="Center"
+                                               IsHitTestVisible="False"/>
+                                </Grid>
 
-                                                    <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                                                        <TextBlock Text="{Binding Title}" FontSize="14" Foreground="White" TextWrapping="Wrap"/>
-                                                        <TextBlock Text="{Binding Sub}" FontSize="12" Foreground="#BFBFBF" Margin="0,3,0,0"/>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </Border>
-
-                            </StackPanel>
+                            </Border>
                         </Border>
+
+                        <!-- ★復活：クイズ検索候補（スクロールバー非表示） -->
+                        <Popup x:Name="QuizSuggestPopup"
+                               PlacementTarget="{Binding ElementName=QuizSearchTextBox}"
+                               Placement="Bottom"
+                               StaysOpen="False"
+                               AllowsTransparency="True">
+                            <Border Background="#DD111111"
+                                    CornerRadius="10"
+                                    BorderBrush="#2A2A2A"
+                                    BorderThickness="1"
+                                    Width="340"
+                                    Margin="0,6,0,0">
+                                <ListBox x:Name="QuizSuggestList"
+                                         ItemsSource="{Binding QuizSuggestions}"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Foreground="White"
+                                         SelectionMode="Single"
+                                         ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         MouseLeftButtonUp="QuizSuggestList_MouseLeftButtonUp"
+                                         PreviewKeyDown="QuizSuggestList_PreviewKeyDown">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="10,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="50"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <Border Width="46" Height="68" CornerRadius="6" ClipToBounds="True" Background="#222">
+                                                    <Image Stretch="UniformToFill" Source="{Binding PosterThumbUrl}"/>
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                                    <TextBlock Text="{Binding Title}" FontSize="14" Foreground="White" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Sub}" FontSize="12" Foreground="#BFBFBF" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                        </Popup>
+
                     </StackPanel>
                 </Border>
             </Grid>
 
-            <!-- 検索バー + 候補 -->
+            <!-- 検索バー + 候補（作品検索：既存） -->
             <Grid Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -322,6 +349,8 @@
                                      VerticalContentAlignment="Center"
                                      Text="作品名を検索..."
                                      Foreground="Gray"
+                                     CaretBrush="White"
+                                     Cursor="IBeam"
                                      GotFocus="SearchBox_GotFocus"
                                      LostFocus="SearchBox_LostFocus"
                                      TextChanged="SearchTextBox_TextChanged"
@@ -346,7 +375,7 @@
                         </Grid>
                     </Border>
 
-                    <!-- 候補（既存のまま使う） -->
+                    <!-- 候補（作品検索：既存） -->
                     <Border x:Name="SuggestBorder"
                             Grid.Row="1"
                             Visibility="Collapsed"
@@ -386,6 +415,7 @@
                     </Border>
                 </Grid>
             </Grid>
+
         </Grid>
     </Grid>
 </Window>
