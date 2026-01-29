@@ -1266,11 +1266,34 @@ namespace Movie_AnimeQuizApp {
                 if (token.IsCancellationRequested) return;
 
                 int before = _posterUrls.Count;
+                int page = guard + 1;
 
-                await AddPosterUrlsFromUrlAsync("https://api.themoviedb.org/3/trending/movie/day?api_key=" + ApiKey + "&language=ja-JP");
-                await AddPosterUrlsFromUrlAsync("https://api.themoviedb.org/3/trending/tv/day?api_key=" + ApiKey + "&language=ja-JP");
-                await AddPosterUrlsFromUrlAsync("https://api.themoviedb.org/3/movie/popular?api_key=" + ApiKey + "&language=ja-JP&region=JP&page=" + (guard + 1));
-                await AddPosterUrlsFromUrlAsync("https://api.themoviedb.org/3/tv/popular?api_key=" + ApiKey + "&language=ja-JP&page=" + (guard + 1));
+                // 1) 日本のアニメ（TV：Animation=16 / 日本語）
+                await AddPosterUrlsFromUrlAsync(
+                    "https://api.themoviedb.org/3/discover/tv?api_key=" + ApiKey +
+                    "&language=ja-JP&sort_by=popularity.desc" +
+                    "&with_genres=16&with_original_language=ja" +
+                    "&with_without_genres=27" +   // ホラー除外（健全寄り）
+                    "&page=" + page
+                );
+
+                // 2) 日本で人気の映画（region=JP）
+                await AddPosterUrlsFromUrlAsync(
+                    "https://api.themoviedb.org/3/discover/movie?api_key=" + ApiKey +
+                    "&language=ja-JP&region=JP&sort_by=popularity.desc" +
+                    "&include_adult=false" +      // 成人向け除外
+                    "&with_without_genres=27" +   // ホラー除外
+                    "&page=" + page
+                );
+
+                // 3) 人気のドラマ（TV：Drama=18）
+                await AddPosterUrlsFromUrlAsync(
+                    "https://api.themoviedb.org/3/discover/tv?api_key=" + ApiKey +
+                    "&language=ja-JP&sort_by=popularity.desc" +
+                    "&with_genres=18" +
+                    "&with_without_genres=27" +   // ホラー除外
+                    "&page=" + page
+                );
 
                 if (_posterUrls.Count == before) break;
                 guard++;

@@ -116,14 +116,6 @@ namespace Movie_AnimeQuizApp.Views {
                 return;
             }
 
-            var r = MessageBox.Show(
-                "このクイズを削除します。\n\n" + sel.WorkTitle + "\n" + sel.Question,
-                "確認",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning
-            );
-            if (r != MessageBoxResult.Yes) return;
-
             await AppDb.InitAsync();
 
             try {
