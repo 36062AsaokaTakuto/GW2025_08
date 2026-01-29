@@ -1,4 +1,9 @@
-﻿using Newtonsoft.Json.Linq;
+﻿// MediaBrowser.xaml.cs（全体）
+// 目的：クイズ検索ボックス表示までは下を押し下げ、候補リストはPopupで重ねて表示（下を押し下げない）
+
+using Movie_AnimeQuizApp.Data;
+using Movie_AnimeQuizApp.Data.Entities;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -8,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -18,10 +24,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-
-// ★クイズ起動用（QuizSessionは使わない）
-using Movie_AnimeQuizApp.Data;
-using Movie_AnimeQuizApp.Data.Entities;
 
 namespace Movie_AnimeQuizApp {
     public partial class MediaBrowser : Window {
@@ -85,7 +87,7 @@ namespace Movie_AnimeQuizApp {
             // ★Bindingの要
             DataContext = this;
 
-            // ★クイズ候補ListBoxのItemsSource（XAML Bindingにしていないのでここで紐づけ）
+            // ★クイズ候補ListBoxのItemsSource
             if (QuizWorkSuggestList != null) {
                 QuizWorkSuggestList.ItemsSource = _quizWorkSuggestions;
             }
@@ -96,10 +98,10 @@ namespace Movie_AnimeQuizApp {
             Loaded += MediaBrowser_Loaded;
             SizeChanged += (_, __) => UpdateCardWidth();
             Activated += MediaBrowser_Activated;
-            PreviewMouseDown += Window_PreviewMouseDown; // ★外クリックでクイズ検索フォーカス解除
 
             Closing += (_, __) => {
-                if (_cts != null) _cts.Cancel();
+                try { _cts?.Cancel(); } catch { }
+                try { _ctsQuizWorkSuggest?.Cancel(); } catch { }
                 try { _imgGate.Dispose(); } catch { }
             };
 
@@ -126,6 +128,7 @@ namespace Movie_AnimeQuizApp {
                 QuizSearchTextBox.Foreground = Brushes.White;
                 QuizSearchTextBox.IsReadOnlyCaretVisible = false;
             }
+            HideQuizWorkSuggest();
         }
 
         private async void MediaBrowser_Loaded(object sender, RoutedEventArgs e) {
@@ -175,21 +178,22 @@ namespace Movie_AnimeQuizApp {
         }
 
         // =========================================================
-        // 外クリック：クイズ検索のフォーカス制御（SearchResultWindowと同じ）
+        // 外クリック：クイズ検索のフォーカス制御
         // =========================================================
         private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e) {
             DependencyObject src = e.OriginalSource as DependencyObject;
 
+            // TextBox外クリックでフォーカス解除
             if (QuizSearchTextBox != null && QuizSearchTextBox.IsKeyboardFocusWithin) {
                 if (src == null || !IsDescendant(src, QuizSearchTextBox)) {
                     Keyboard.ClearFocus();
                 }
             }
 
-            // ★追加：クイズ候補を閉じる（検索ボックス/候補以外を押したら）
-            if (QuizWorkSuggestBorder != null && QuizWorkSuggestBorder.Visibility == Visibility.Visible) {
+            // ★候補Popup外クリックで閉じる
+            if (QuizWorkSuggestPopup != null && QuizWorkSuggestPopup.IsOpen) {
                 bool insideQuizBox = (QuizSearchTextBox != null && src != null && IsDescendant(src, QuizSearchTextBox));
-                bool insideQuizSuggest = (src != null && IsDescendant(src, QuizWorkSuggestBorder));
+                bool insideQuizSuggest = (src != null && QuizWorkSuggestBorder != null && IsDescendant(src, QuizWorkSuggestBorder));
                 if (!insideQuizBox && !insideQuizSuggest) {
                     HideQuizWorkSuggest();
                 }
@@ -262,8 +266,6 @@ namespace Movie_AnimeQuizApp {
             if (QuizMenu != null) QuizMenu.Visibility = Visibility.Collapsed;
 
             HideQuizSearchPanel();
-
-            // ★追加
             HideQuizWorkSuggest();
         }
 
@@ -306,9 +308,8 @@ namespace Movie_AnimeQuizApp {
 
         private void HideQuizSearchPanel() {
             if (QuizSearchTextBox != null && QuizSearchTextBox.IsKeyboardFocusWithin) return;
-            if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
 
-            // ★追加
+            if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
             HideQuizWorkSuggest();
         }
 
@@ -350,14 +351,14 @@ namespace Movie_AnimeQuizApp {
             if (QuizSearchTextBox == null) return;
             if (QuizSearchTextBox.IsKeyboardFocusWithin) CancelMenuHide();
 
-            // ★追加：作ってあるクイズ候補を更新
+            // ★候補を更新（ひらがな/カタカナ/大小文字対応）
             StartQuizWorkSuggestDebounce((QuizSearchTextBox.Text ?? "").Trim());
         }
 
         // ★XAMLが呼んでるので必須
         private async void QuizSearch_PreviewKeyDown(object sender, KeyEventArgs e) {
             if (e.Key == Key.Escape) {
-                HideQuizWorkSuggest(); // ★追加
+                HideQuizWorkSuggest();
                 Keyboard.ClearFocus();
                 e.Handled = true;
                 return;
@@ -402,7 +403,7 @@ namespace Movie_AnimeQuizApp {
 
             int firstQuizId = quizzes.OrderBy(q => q.QuizId).First().QuizId;
 
-            // ★追加：候補を閉じる
+            // ★候補を閉じる
             HideQuizWorkSuggest();
 
             // クイズ回答画面へ（全画面）
@@ -446,14 +447,11 @@ namespace Movie_AnimeQuizApp {
 
             int firstQuizId = quizzes.OrderBy(x => Guid.NewGuid()).First().QuizId;
 
-            // ★追加：候補を閉じる
             HideQuizWorkSuggest();
 
             var win = new Movie_AnimeQuizApp.Views.QuizPlayWindow(work.WorkKey, firstQuizId);
             win.Owner = this;
             win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-            // ★追加：全画面（最大化）
             win.WindowState = WindowState.Maximized;
 
             if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
@@ -474,7 +472,7 @@ namespace Movie_AnimeQuizApp {
             HideMenus();
 
             Window w = CreateWindowByTypeNames(new string[] {
-                "Movie_AnimeQuizApp.Views.QuizCreateWindow", // ★追加（これが本命）
+                "Movie_AnimeQuizApp.Views.QuizCreateWindow",
                 "Movie_AnimeQuizApp.QuizCreateWindow",
                 "Movie_AnimeQuizApp.QuizCreate",
                 "Movie_AnimeQuizApp.QuizCreatePage"
@@ -523,7 +521,7 @@ namespace Movie_AnimeQuizApp {
                 return;
             }
 
-            if (_ctsQuizWorkSuggest != null) _ctsQuizWorkSuggest.Cancel();
+            try { _ctsQuizWorkSuggest?.Cancel(); } catch { }
             _ctsQuizWorkSuggest = new CancellationTokenSource();
             var token = _ctsQuizWorkSuggest.Token;
 
@@ -618,10 +616,13 @@ namespace Movie_AnimeQuizApp {
 
         private void ShowQuizWorkSuggest() {
             if (QuizWorkSuggestBorder != null) QuizWorkSuggestBorder.Visibility = Visibility.Visible;
+            if (QuizWorkSuggestPopup != null) QuizWorkSuggestPopup.IsOpen = true;
         }
 
         private void HideQuizWorkSuggest() {
+            if (QuizWorkSuggestPopup != null) QuizWorkSuggestPopup.IsOpen = false;
             if (QuizWorkSuggestBorder != null) QuizWorkSuggestBorder.Visibility = Visibility.Collapsed;
+
             if (QuizWorkSuggestList != null) QuizWorkSuggestList.SelectedIndex = -1;
             _quizWorkSuggestions.Clear();
         }
@@ -657,11 +658,33 @@ namespace Movie_AnimeQuizApp {
             return "https://image.tmdb.org/t/p/w92" + p;
         }
 
+        // ★ひらがな/カタカナ統一 + 半角/全角寄せ + 小文字/大文字無視
         private static string Normalize(string s) {
             if (s == null) return "";
-            s = s.Trim().ToLowerInvariant();
-            var chars = s.Where(ch => !char.IsWhiteSpace(ch)).ToArray();
-            return new string(chars);
+            s = s.Trim();
+
+            // 全角/半角などを寄せる
+            s = s.Normalize(NormalizationForm.FormKC);
+
+            // 小文字化（英字）
+            s = s.ToLowerInvariant();
+
+            // 空白除去
+            s = new string(s.Where(ch => !char.IsWhiteSpace(ch)).ToArray());
+
+            // カタカナ→ひらがな（タイトル側・クエリ側を同じルールにする）
+            var sb = new StringBuilder(s.Length);
+            for (int i = 0; i < s.Length; i++) {
+                char ch = s[i];
+
+                // 全角カタカナ範囲：ァ(30A1) ～ ヶ(30F6)
+                if (ch >= '\u30A1' && ch <= '\u30F6') {
+                    ch = (char)(ch - 0x60); // ひらがなへ
+                }
+                sb.Append(ch);
+            }
+
+            return sb.ToString();
         }
 
         private static string ToJaDate(string raw) {
@@ -673,7 +696,7 @@ namespace Movie_AnimeQuizApp {
             return raw;
         }
 
-        // ★追加：クイズ候補用Item
+        // ★候補用Item
         private class QuizWorkSuggestItem {
             public string WorkKey { get; set; }
             public string Title { get; set; }
@@ -753,6 +776,7 @@ namespace Movie_AnimeQuizApp {
             foreach (GenreOption it in list.OrderBy(x => x.Name))
                 Genres.Add(it);
 
+            // 映画の「履歴」だけ消す（元コード踏襲）
             if (!IsMovieMode()) return;
 
             for (int i = Genres.Count - 1; i >= 0; i--) {
@@ -783,7 +807,7 @@ namespace Movie_AnimeQuizApp {
         // 一覧：読み込み
         // =========================================================
         private async Task ResetAndLoadAsync() {
-            if (_cts != null) _cts.Cancel();
+            try { _cts?.Cancel(); } catch { }
             _cts = new CancellationTokenSource();
             CancellationToken token = _cts.Token;
 
@@ -1111,13 +1135,16 @@ namespace Movie_AnimeQuizApp {
                 set {
                     if (_isSelected == value) return;
                     _isSelected = value;
-                    if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs("IsSelected"));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsSelected"));
                 }
             }
 
             public event PropertyChangedEventHandler PropertyChanged;
         }
 
+        // =========================================================
+        // クイズ削除（モーダルで前に出す）
+        // =========================================================
         private void QuizDelete_Click(object sender, RoutedEventArgs e) {
             HideMenus();
 
