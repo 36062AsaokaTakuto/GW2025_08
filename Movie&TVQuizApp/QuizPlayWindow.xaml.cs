@@ -77,6 +77,7 @@ namespace Movie_AnimeQuizApp.Views {
 
         private async void QuizPlayWindow_Loaded(object sender, RoutedEventArgs e) {
             await AppDb.InitAsync();
+            MessageBox.Show(Movie_AnimeQuizApp.Share.QuizShare.GetShareFilePath());
             try { await Movie_AnimeQuizApp.Share.QuizShare.ImportToDbAsync(); } catch { }
 
 

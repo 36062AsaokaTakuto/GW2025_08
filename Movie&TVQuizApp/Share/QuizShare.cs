@@ -57,14 +57,22 @@ namespace Movie_AnimeQuizApp.Share {
             try {
                 var d = new DirectoryInfo(startDir);
                 while (d != null) {
-                    var git = Path.Combine(d.FullName, ".git");
-                    if (Directory.Exists(git)) return d.FullName;
+                    // ★.git が「フォルダ」でも「ファイル」でもOKにする
+                    string gitPath = Path.Combine(d.FullName, ".git");
+                    if (Directory.Exists(gitPath) || File.Exists(gitPath))
+                        return d.FullName;
+
+                    // ★保険：.sln があればそこをルート扱い
+                    if (d.EnumerateFiles("*.sln").Any())
+                        return d.FullName;
+
                     d = d.Parent;
                 }
             }
             catch { }
             return "";
         }
+
 
         // 保存時：共有ファイルへ追記（DB保存とは別。失敗してもDBは保存済み）
         public static async Task AppendAsync(Work work, Quiz quiz, List<Choice> choices) {
