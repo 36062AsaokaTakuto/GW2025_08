@@ -1,8 +1,6 @@
-﻿// QuizDeleteWindow.xaml.cs（修正後・全体）
-// 変更点：作成者プレースホルダー制御（Watermark表示/非表示）
-// ※削除やDB処理はそのまま
-using Movie_AnimeQuizApp.Data;
+﻿using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
+using Movie_AnimeQuizApp.Share; // ★追加
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -68,8 +66,6 @@ namespace Movie_AnimeQuizApp.Views {
 
             if (quizzes == null) quizzes = new List<Quiz>();
 
-            // ★追加：作成日順（古い→新しい）に並べ替え
-            // CreatedAt が "yyyy-MM-dd HH:mm:ss" 前提なので文字列比較でOK
             quizzes = quizzes
                 .OrderBy(q => (q != null ? (q.CreatedAt ?? "") : ""))
                 .ThenBy(q => (q != null ? q.QuizId : 0))
@@ -108,7 +104,6 @@ namespace Movie_AnimeQuizApp.Views {
             StatusText.Text = "件数: " + _items.Count.ToString();
         }
 
-
         private async void DeleteSelected_Click(object sender, RoutedEventArgs e) {
             var sel = QuizList.SelectedItem as QuizDeleteItem;
             if (sel == null) {
@@ -119,12 +114,36 @@ namespace Movie_AnimeQuizApp.Views {
             await AppDb.InitAsync();
 
             try {
+                // ★削除ログ用に、削除前に元データを取る（QuizIdは端末ごとに違うので WorkKey/Question/Choices が必要）
+                Quiz quiz = await AppDb.Connection.Table<Quiz>()
+                    .Where(q => q.QuizId == sel.QuizId)
+                    .FirstOrDefaultAsync();
+
+                if (quiz == null) return;
+
+                List<Choice> choices = await AppDb.Connection.Table<Choice>()
+                    .Where(c => c.QuizId == sel.QuizId)
+                    .ToListAsync();
+
+                Work work = await AppDb.Connection.Table<Work>()
+                    .Where(w => w.WorkKey == quiz.WorkKey)
+                    .FirstOrDefaultAsync();
+
+                // DB削除（元の処理そのまま）
                 await AppDb.Connection.ExecuteAsync("DELETE FROM [Choice] WHERE QuizId = ?", sel.QuizId);
                 await AppDb.Connection.ExecuteAsync("DELETE FROM [Play]   WHERE QuizId = ?", sel.QuizId);
                 await AppDb.Connection.ExecuteAsync("DELETE FROM [Quiz]   WHERE QuizId = ?", sel.QuizId);
 
                 _items.Remove(sel);
                 StatusText.Text = "件数: " + _items.Count.ToString();
+
+                // ★共有に「delete」を追記（相手側にも反映される）
+                try {
+                    await QuizShare.AppendDeleteAsync(work, quiz, choices ?? new List<Choice>());
+                }
+                catch (Exception ex2) {
+                    MessageBox.Show("削除はできましたが、共有ファイルへの反映に失敗しました。\n" + ex2.Message);
+                }
             }
             catch (Exception ex) {
                 MessageBox.Show("削除に失敗しました。\n" + ex.Message);
