@@ -36,6 +36,12 @@ namespace Movie_AnimeQuizApp.Views {
         private CancellationTokenSource _searchCts;
         private CancellationTokenSource _imageCts;
 
+        private const string OverviewInstruction = "空白になっている言葉を選択肢から選べ。";
+        private static readonly string[] OverviewBlockPhrases = new[] {
+            "概要がまだ翻訳されていません",
+            "翻訳版を入力してデータベースを一緒に充実させましょう"
+        };
+
         public QuizCreateWindow() {
             InitializeComponent();
 
@@ -260,6 +266,7 @@ namespace Movie_AnimeQuizApp.Views {
                 if (WorkSuggestPopup != null) WorkSuggestPopup.IsOpen = false;
 
                 ApplyWorkToUI(work);
+                ApplyOverviewToQuestionBox(work);
             }
             catch (OperationCanceledException) { }
             catch { }
@@ -454,5 +461,46 @@ namespace Movie_AnimeQuizApp.Views {
             public string PosterThumbUrl { get; set; }
             public string Sub { get; set; }
         }
+
+        private void ApplyOverviewToQuestionBox(Work work) {
+            if (QuestionTextBox == null) return;
+
+            string ov = (work?.Overview ?? "").Trim();
+
+            // 何もないなら「指示文だけ」
+            if (ov.Length == 0) {
+                QuestionTextBox.Text = OverviewInstruction + Environment.NewLine;
+                QuestionTextBox.Foreground = Brushes.White;
+                return;
+            }
+
+            // ★「翻訳されていません…」系は表示しない
+            for (int i = 0; i < OverviewBlockPhrases.Length; i++) {
+                if (ov.Contains(OverviewBlockPhrases[i])) {
+                    // 指示文だけにする（概要は出さない）
+                    QuestionTextBox.Text = OverviewInstruction + Environment.NewLine;
+                    QuestionTextBox.Foreground = Brushes.White;
+                    return;
+                }
+            }
+
+            // ★日本語じゃなさそうなら表示しない（ひらがな/カタカナ/漢字が含まれない場合）
+            bool hasJa = ov.Any(ch =>
+                (ch >= '\u3040' && ch <= '\u309F') ||   // ひらがな
+                (ch >= '\u30A0' && ch <= '\u30FF') ||   // カタカナ
+                (ch >= '\u4E00' && ch <= '\u9FFF')      // 漢字
+            );
+
+            if (!hasJa) {
+                QuestionTextBox.Text = OverviewInstruction + Environment.NewLine;
+                QuestionTextBox.Foreground = Brushes.White;
+                return;
+            }
+
+            // ★先頭行に指示文、その下に概要
+            QuestionTextBox.Text = OverviewInstruction + Environment.NewLine + ov;
+            QuestionTextBox.Foreground = Brushes.White;
+        }
+
     }
 }
