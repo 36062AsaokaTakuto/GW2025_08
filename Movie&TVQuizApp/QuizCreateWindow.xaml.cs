@@ -36,7 +36,7 @@ namespace Movie_AnimeQuizApp.Views {
         private CancellationTokenSource _searchCts;
         private CancellationTokenSource _imageCts;
 
-        private const string OverviewInstruction = "空白になっている言葉を選択肢から選べ。";
+        private const string OverviewInstruction = "〇になっている単語を選択肢から選べ。";
         private static readonly string[] OverviewBlockPhrases = new[] {
             "概要がまだ翻訳されていません",
             "翻訳版を入力してデータベースを一緒に充実させましょう"
