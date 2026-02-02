@@ -442,11 +442,9 @@ namespace Movie_AnimeQuizApp.Views {
                     }
                 );
 
-                MessageBox.Show("保存しました。");
                 Close();
             }
             catch (Exception ex) {
-                MessageBox.Show("保存に失敗しました。\n" + ex.Message);
             }
         }
 

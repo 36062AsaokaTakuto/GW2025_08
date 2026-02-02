@@ -4,6 +4,8 @@
 //  - CompareInfo(ja-JP)で IgnoreKanaType / IgnoreWidth / IgnoreCase の一致判定
 //  - クイズ候補（DB）は最初に一度だけインデックス取得→メモリで高速フィルタ
 //  - TMDB候補も「最後の絞り込み」を ja比較で落ちないように
+//  - ★追加：中央検索（TMDB候補）で ひら⇔カタ を相互に検索できるようにする（クエリを最大3種で検索→マージ）
+//  - ★追加：キャッシュキーもひらがな寄せで分裂しないようにする
 
 using Newtonsoft.Json.Linq;
 using System;
@@ -14,6 +16,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Text; // ★追加
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -62,6 +65,55 @@ namespace Movie_AnimeQuizApp {
             q = q ?? "";
             if (q.Length == 0) return true;
             return _jaComp.IsPrefix(src, q, _jaOpt);
+        }
+
+        // =====================================================
+        // ★追加：ひらがな⇔カタカナの相互検索用ヘルパー（TMDB検索クエリ生成）
+        // =====================================================
+        private static string NormalizeNfkc(string s) =>
+            (s ?? "").Normalize(NormalizationForm.FormKC);
+
+        private static string ToHiragana(string s) {
+            s = NormalizeNfkc(s);
+            var sb = new StringBuilder(s.Length);
+            foreach (char ch in s) {
+                // カタカナ → ひらがな（ァ-ヶ など）
+                if (ch >= '\u30A1' && ch <= '\u30F6') sb.Append((char)(ch - 0x60));
+                else sb.Append(ch);
+            }
+            return sb.ToString();
+        }
+
+        private static string ToKatakana(string s) {
+            s = NormalizeNfkc(s);
+            var sb = new StringBuilder(s.Length);
+            foreach (char ch in s) {
+                // ひらがな → カタカナ（ぁ-ゖ など）
+                if (ch >= '\u3041' && ch <= '\u3096') sb.Append((char)(ch + 0x60));
+                else sb.Append(ch);
+            }
+            return sb.ToString();
+        }
+
+        private static List<string> BuildQueryVariants(string query) {
+            query = (query ?? "").Trim();
+            if (query.Length == 0) return new List<string>();
+
+            string nfkc = NormalizeNfkc(query);
+
+            var list = new List<string>();
+            void Add(string x) {
+                x = (x ?? "").Trim();
+                if (x.Length == 0) return;
+                if (!list.Any(s => string.Equals(s, x, StringComparison.Ordinal))) list.Add(x);
+            }
+
+            // 優先順：そのまま → ひら → カタ
+            Add(nfkc);
+            Add(ToHiragana(nfkc));
+            Add(ToKatakana(nfkc));
+
+            return list;
         }
 
         // ===== 作品検索候補（TMDB） =====
@@ -1011,7 +1063,10 @@ namespace Movie_AnimeQuizApp {
             Suggestions.Clear();
         }
 
-        private async Task<SuggestItem[]> FetchSuggestionsAsync(string query, CancellationToken token) {
+        // =====================================================
+        // ★追加：TMDB 1回分の検索（バリアント検索の部品）
+        // =====================================================
+        private async Task<List<SuggestItem>> FetchSuggestionsOnceAsync(string query, CancellationToken token) {
             try {
                 string url =
                     "https://api.themoviedb.org/3/search/multi?api_key=" + ApiKey +
@@ -1019,11 +1074,11 @@ namespace Movie_AnimeQuizApp {
                     "&page=1";
 
                 string json = await _http.GetStringAsync(url);
-                if (token.IsCancellationRequested) return new SuggestItem[0];
+                if (token.IsCancellationRequested) return new List<SuggestItem>();
 
                 JObject obj = JObject.Parse(json);
                 JArray results = obj["results"] as JArray;
-                if (results == null || results.Count == 0) return new SuggestItem[0];
+                if (results == null || results.Count == 0) return new List<SuggestItem>();
 
                 var items = new List<SuggestItem>();
 
@@ -1044,20 +1099,51 @@ namespace Movie_AnimeQuizApp {
                     string dateRaw = GetDateRaw(r, mt);
                     string dateText = ToJaDate(dateRaw);
 
-                    var si = new SuggestItem {
+                    items.Add(new SuggestItem {
                         Id = id,
                         MediaType = mt,
                         Title = title,
                         Sub = (mt == "movie" ? "映画" : "テレビ番組") + (string.IsNullOrWhiteSpace(dateText) ? "" : " ・ " + dateText),
                         PosterThumbUrl = BuildPosterThumbUrl(poster),
                         NormTitle = Normalize(title)
-                    };
-
-                    items.Add(si);
+                    });
                 }
 
-                // ★最後の絞り込みを「かな/幅/大小無視」で落ちないように
-                var ordered = items
+                return items;
+            }
+            catch {
+                return new List<SuggestItem>();
+            }
+        }
+
+        // =====================================================
+        // ★変更：中央検索（TMDB候補）を「そのまま/ひら/カタ」で検索→マージ
+        // =====================================================
+        private async Task<SuggestItem[]> FetchSuggestionsAsync(string query, CancellationToken token) {
+            try {
+                var variants = BuildQueryVariants(query);
+                if (variants.Count == 0) return new SuggestItem[0];
+
+                // ★(mediaType:id)で重複排除してマージ
+                var map = new Dictionary<string, SuggestItem>();
+
+                for (int i = 0; i < variants.Count; i++) {
+                    if (token.IsCancellationRequested) break;
+
+                    var part = await FetchSuggestionsOnceAsync(variants[i], token);
+                    if (token.IsCancellationRequested) break;
+
+                    for (int j = 0; j < part.Count; j++) {
+                        var s = part[j];
+                        string key = s.MediaType + ":" + s.Id.ToString();
+                        if (!map.ContainsKey(key)) map[key] = s; // 先に入った方（そのまま検索の結果）を優先
+                    }
+                }
+
+                var merged = map.Values.ToList();
+
+                // ★最後の絞り込みは「元の query」で（IgnoreKanaTypeなのでひら/カタ差OK）
+                var ordered = merged
                     .Where(s => JaContains(s.Title, query))
                     .OrderByDescending(s => JaStartsWith(s.Title, query))
                     .ThenBy(s => s.Title, StringComparer.CurrentCulture)
@@ -1088,9 +1174,11 @@ namespace Movie_AnimeQuizApp {
             return r["first_air_date"] != null ? r["first_air_date"].ToString() : "";
         }
 
+        // ★変更：キャッシュキーや比較用の正規化（NFKC + ひらがな寄せ + 英字小文字 + 空白除去）
         private static string Normalize(string s) {
-            if (s == null) return "";
-            s = s.Trim().ToLowerInvariant();
+            s = NormalizeNfkc(s ?? "");
+            s = ToHiragana(s);               // ★カタカナ→ひらがなへ寄せる
+            s = s.Trim().ToLowerInvariant(); // 英字大小も統一
             var chars = s.Where(ch => !char.IsWhiteSpace(ch)).ToArray();
             return new string(chars);
         }
