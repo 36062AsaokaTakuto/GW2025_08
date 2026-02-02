@@ -29,6 +29,8 @@ using System.Windows.Threading;
 using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Movie_AnimeQuizApp.Views;
+using Movie_AnimeQuizApp.Share;
+
 
 namespace Movie_AnimeQuizApp {
     public partial class MainWindow : Window {
@@ -220,6 +222,8 @@ namespace Movie_AnimeQuizApp {
         }
 
         private async void MainWindow_ContentRendered(object sender, EventArgs e) {
+            int imported = await QuizShare.ImportToDbAsync();
+            if (imported > 0) InvalidateQuizIndex();
             ApplyCanvasTransform();
             await ReloadBackgroundAsync();
         }
