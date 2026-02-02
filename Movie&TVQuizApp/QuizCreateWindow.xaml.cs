@@ -16,6 +16,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Collections.Generic;
+using System.Globalization;   // ★追加
+using System.Text;          // ★追加
 
 namespace Movie_AnimeQuizApp.Views {
     public partial class QuizCreateWindow : Window {
@@ -41,6 +43,78 @@ namespace Movie_AnimeQuizApp.Views {
             "概要がまだ翻訳されていません",
             "翻訳版を入力してデータベースを一緒に充実させましょう"
         };
+
+        // =====================================================
+        // ★追加：ひら/カタ、半角/全角、英字大小を無視して比較
+        // =====================================================
+        private static readonly CompareInfo _jaComp =
+            CultureInfo.GetCultureInfo("ja-JP").CompareInfo;
+
+        private const CompareOptions _jaOpt =
+            CompareOptions.IgnoreCase |
+            CompareOptions.IgnoreKanaType |
+            CompareOptions.IgnoreWidth;
+
+        private static bool JaContains(string src, string q) {
+            src = src ?? "";
+            q = q ?? "";
+            if (q.Length == 0) return true;
+            return _jaComp.IndexOf(src, q, _jaOpt) >= 0;
+        }
+
+        private static bool JaStartsWith(string src, string q) {
+            src = src ?? "";
+            q = q ?? "";
+            if (q.Length == 0) return true;
+            return _jaComp.IsPrefix(src, q, _jaOpt);
+        }
+
+        // ★追加：検索クエリを「そのまま/ひら/カタ」に展開（TMDB用）
+        private static string NormalizeNfkc(string s) =>
+            (s ?? "").Normalize(NormalizationForm.FormKC);
+
+        private static string ToHiragana(string s) {
+            s = NormalizeNfkc(s);
+            var sb = new StringBuilder(s.Length);
+            foreach (char ch in s) {
+                // カタカナ → ひらがな（ァ-ヶ 等）
+                if (ch >= '\u30A1' && ch <= '\u30F6') sb.Append((char)(ch - 0x60));
+                else sb.Append(ch);
+            }
+            return sb.ToString();
+        }
+
+        private static string ToKatakana(string s) {
+            s = NormalizeNfkc(s);
+            var sb = new StringBuilder(s.Length);
+            foreach (char ch in s) {
+                // ひらがな → カタカナ（ぁ-ゖ 等）
+                if (ch >= '\u3041' && ch <= '\u3096') sb.Append((char)(ch + 0x60));
+                else sb.Append(ch);
+            }
+            return sb.ToString();
+        }
+
+        private static List<string> BuildQueryVariants(string query) {
+            query = (query ?? "").Trim();
+            if (query.Length == 0) return new List<string>();
+
+            string nfkc = NormalizeNfkc(query);
+
+            var list = new List<string>();
+            void Add(string x) {
+                x = (x ?? "").Trim();
+                if (x.Length == 0) return;
+                if (!list.Any(s => string.Equals(s, x, StringComparison.Ordinal))) list.Add(x);
+            }
+
+            // 優先順：そのまま → ひら → カタ
+            Add(nfkc);
+            Add(ToHiragana(nfkc));
+            Add(ToKatakana(nfkc));
+
+            return list;
+        }
 
         public QuizCreateWindow() {
             InitializeComponent();
@@ -149,7 +223,43 @@ namespace Movie_AnimeQuizApp.Views {
             }
         }
 
+        // =====================================================
+        // ★変更：TMDB検索を「そのまま/ひら/カタ」最大3回叩いてマージ
+        // =====================================================
         private async Task<TmdbSuggestItem[]> SearchTmdbAsync(string query, CancellationToken token) {
+            var variants = BuildQueryVariants(query);
+            if (variants.Count == 0) return Array.Empty<TmdbSuggestItem>();
+
+            // (mediaType:id)で重複排除
+            var map = new Dictionary<string, TmdbSuggestItem>();
+
+            for (int i = 0; i < variants.Count; i++) {
+                if (token.IsCancellationRequested) break;
+
+                var part = await SearchTmdbOnceAsync(variants[i], token);
+                if (token.IsCancellationRequested) break;
+
+                for (int j = 0; j < part.Length; j++) {
+                    var x = part[j];
+                    string key = (x.MediaType ?? "") + ":" + x.TmdbId.ToString();
+                    if (!map.ContainsKey(key)) map[key] = x; // 先に入った（そのまま）を優先
+                }
+            }
+
+            var merged = map.Values
+                .Where(x => !string.IsNullOrWhiteSpace(x.Title))
+                // ★最後の絞り込み：ひら/カタ等を無視して一致
+                .Where(x => JaContains(x.Title, query))
+                .OrderByDescending(x => JaStartsWith(x.Title, query)) // prefix優先
+                .ThenBy(x => x.Title, StringComparer.CurrentCulture)
+                .Take(50)
+                .ToArray();
+
+            return merged;
+        }
+
+        // ★追加：TMDB検索 1回分（部品）
+        private async Task<TmdbSuggestItem[]> SearchTmdbOnceAsync(string query, CancellationToken token) {
             string url =
                 "https://api.themoviedb.org/3/search/multi" +
                 "?api_key=" + ApiKey +
@@ -194,11 +304,7 @@ namespace Movie_AnimeQuizApp.Views {
                     .Where(x => !string.IsNullOrWhiteSpace(x.Title))
                     .ToArray();
 
-                return results
-                    .OrderBy(x => x.Title.StartsWith(query, StringComparison.CurrentCultureIgnoreCase) ? 0 : 1)
-                    .ThenBy(x => x.Title)
-                    .Take(50)
-                    .ToArray();
+                return results;
             }
         }
 
@@ -327,7 +433,6 @@ namespace Movie_AnimeQuizApp.Views {
             string backdropUrl = BuildTmdbUrl(TmdbBackdropBase, w.BackdropPath);
 
             try {
-
                 string bgUrl = !string.IsNullOrWhiteSpace(backdropUrl)
                     ? backdropUrl
                     : BuildTmdbUrl(TmdbBackdropBase, w.PosterPath);
@@ -499,6 +604,5 @@ namespace Movie_AnimeQuizApp.Views {
             QuestionTextBox.Text = OverviewInstruction + Environment.NewLine + ov;
             QuestionTextBox.Foreground = Brushes.White;
         }
-
     }
 }

@@ -128,7 +128,7 @@
                            PlacementTarget="{Binding ElementName=WorkSearchTextBox}"
                            Placement="Bottom"
                            StaysOpen="False"
-                           AllowsTransparency="True">
+                           AllowsTransparency="True" >
                         <Border Background="#DD111111"
                                 CornerRadius="10"
                                 BorderBrush="#2A2A2A"
@@ -136,12 +136,15 @@
                                 Width="420"
                                 Margin="0,6,0,0">
                             <ListBox x:Name="WorkSuggestList"
-                                     Background="Transparent"
-                                     BorderThickness="0"
-                                     Foreground="White"
-                                     SelectionMode="Single"
-                                     MouseLeftButtonUp="WorkSuggestList_MouseLeftButtonUp"
-                                     PreviewKeyDown="WorkSuggestList_PreviewKeyDown">
+         Background="Transparent"
+         BorderThickness="0"
+         Foreground="White"
+         SelectionMode="Single"
+         ScrollViewer.VerticalScrollBarVisibility="Hidden"
+         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+         MouseLeftButtonUp="WorkSuggestList_MouseLeftButtonUp"
+         PreviewKeyDown="WorkSuggestList_PreviewKeyDown">
+
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Margin="10,6">
