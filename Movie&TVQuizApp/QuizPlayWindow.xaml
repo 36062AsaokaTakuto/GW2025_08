@@ -181,13 +181,20 @@
                         Background="#8017181D"
                         Padding="18">
                     <Grid>
-                        <TextBlock x:Name="QuestionText"
-                                   Text="QUESTION"
-                                   TextWrapping="Wrap"
-                                   FontSize="33"
-                                   TextAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"/>
+                        <TextBox x:Name="QuestionText"
+         Text="QUESTION"
+         IsReadOnly="True"
+         Background="Transparent"
+         BorderThickness="0"
+         TextWrapping="Wrap"
+         Foreground="White"
+         FontSize="33"
+         TextAlignment="Center"
+         VerticalContentAlignment="Center"
+         HorizontalContentAlignment="Center"
+         ScrollViewer.VerticalScrollBarVisibility="Hidden"
+         ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+
                     </Grid>
                 </Border>
 

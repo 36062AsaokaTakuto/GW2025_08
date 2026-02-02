@@ -186,7 +186,7 @@
                              Foreground="Gray"
                              VerticalScrollBarVisibility="Auto"
                              FontSize="25"
-                             Height="275"
+                             Height="450"
                              GotFocus="Question_GotFocus"
                              LostFocus="Question_LostFocus"/>
                     </Border>
