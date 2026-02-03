@@ -80,7 +80,6 @@
 
         <!-- 前景 -->
         <Grid>
-            <!-- ★ここがポイント：Auto行をやめて、ヘッダー+残り(固定)にする -->
             <Grid.RowDefinitions>
                 <RowDefinition Height="60"/>
                 <RowDefinition Height="*"/>
@@ -283,15 +282,21 @@
                                         BorderBrush="#2A2A2A"
                                         BorderThickness="1"
                                         Width="340"
-                                        Margin="0,6,0,0">
+                                        Margin="0,6,0,0"
+                                        MaxHeight="520">
                                     <ListBox x:Name="QuizSuggestList"
                                              ItemsSource="{Binding QuizSuggestions}"
                                              Background="Transparent"
                                              BorderThickness="0"
                                              Foreground="White"
                                              SelectionMode="Single"
+
                                              ScrollViewer.VerticalScrollBarVisibility="Hidden"
                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ScrollViewer.CanContentScroll="True"
+                                             VirtualizingStackPanel.IsVirtualizing="True"
+                                             VirtualizingStackPanel.VirtualizationMode="Recycling"
+
                                              MouseLeftButtonUp="QuizSuggestList_MouseLeftButtonUp"
                                              PreviewKeyDown="QuizSuggestList_PreviewKeyDown">
                                         <ListBox.ItemTemplate>
