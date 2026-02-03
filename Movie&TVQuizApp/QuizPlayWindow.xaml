@@ -154,10 +154,10 @@
                             <TextBlock Text="制限時間"
                                        Style="{StaticResource SubtleTextStyle}"
                                        HorizontalAlignment="Center"
-                                       FontSize="43"/>
+                                       FontSize="48"/>
                             <TextBlock x:Name="TimerText"
                                        Text="30"
-                                       FontSize="46"
+                                       FontSize="55"
                                        FontWeight="Bold"
                                        HorizontalAlignment="Center"
                                        Margin="0,6,0,0"/>

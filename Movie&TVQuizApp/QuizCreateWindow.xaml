@@ -102,7 +102,7 @@
                            x:Name="WorkTitleText"
                            Style="{StaticResource TitleTextStyle}"
                            Text="未選択"
-                           FontSize="60"
+                           FontSize="70"
                            HorizontalAlignment="Center"
                            Margin="0,50,8,4"/>
 
@@ -174,7 +174,7 @@
                     <TextBlock Text="問題文"
                                Style="{StaticResource LabelTextStyle}"
                                HorizontalAlignment="Center"
-                               FontSize="40"
+                               FontSize="52"
                                Margin="0,100,0,10"/>
                     <!-- ★ここで下げる：上マージンを増やす -->
                     <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0,80,0,0">
@@ -222,7 +222,7 @@
                                 <RadioButton x:Name="CorrectRadio1" Content="正解" GroupName="CorrectChoice"
                                              Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
                                 <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
-                                    <TextBox x:Name="ChoiceTextBox1" Style="{StaticResource DarkTextBoxStyle}" FontSize="16"/>
+                                    <TextBox x:Name="ChoiceTextBox1" Style="{StaticResource DarkTextBoxStyle}" FontSize="25"/>
                                 </Border>
                             </Grid>
                         </Border>
@@ -236,7 +236,7 @@
                                 <RadioButton x:Name="CorrectRadio2" Content="正解" GroupName="CorrectChoice"
                                              Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
                                 <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
-                                    <TextBox x:Name="ChoiceTextBox2" Style="{StaticResource DarkTextBoxStyle}" FontSize="16"/>
+                                    <TextBox x:Name="ChoiceTextBox2" Style="{StaticResource DarkTextBoxStyle}" FontSize="25"/>
                                 </Border>
                             </Grid>
                         </Border>
@@ -250,7 +250,7 @@
                                 <RadioButton x:Name="CorrectRadio3" Content="正解" GroupName="CorrectChoice"
                                              Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
                                 <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
-                                    <TextBox x:Name="ChoiceTextBox3" Style="{StaticResource DarkTextBoxStyle}" FontSize="16"/>
+                                    <TextBox x:Name="ChoiceTextBox3" Style="{StaticResource DarkTextBoxStyle}" FontSize="25"/>
                                 </Border>
                             </Grid>
                         </Border>
