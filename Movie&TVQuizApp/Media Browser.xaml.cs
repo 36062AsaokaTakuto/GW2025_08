@@ -478,8 +478,7 @@ namespace Movie_AnimeQuizApp {
                 "Movie_AnimeQuizApp.QuizCreatePage"
             });
 
-            if (w == null) {
-                MessageBox.Show("クイズ作成画面（QuizCreateWindow）が見つかりません。");
+            if (w == null) { 
                 return;
             }
 

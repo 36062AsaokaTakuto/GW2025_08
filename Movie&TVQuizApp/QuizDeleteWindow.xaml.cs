@@ -1,6 +1,6 @@
 ﻿using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
-using Movie_AnimeQuizApp.Share; // ★追加
+using Movie_AnimeQuizApp.Share; 
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -107,7 +107,6 @@ namespace Movie_AnimeQuizApp.Views {
         private async void DeleteSelected_Click(object sender, RoutedEventArgs e) {
             var sel = QuizList.SelectedItem as QuizDeleteItem;
             if (sel == null) {
-                MessageBox.Show("削除するクイズを選択してください。");
                 return;
             }
 
@@ -142,11 +141,9 @@ namespace Movie_AnimeQuizApp.Views {
                     await QuizShare.AppendDeleteAsync(work, quiz, choices ?? new List<Choice>());
                 }
                 catch (Exception ex2) {
-                    MessageBox.Show("削除はできましたが、共有ファイルへの反映に失敗しました。\n" + ex2.Message);
                 }
             }
             catch (Exception ex) {
-                MessageBox.Show("削除に失敗しました。\n" + ex.Message);
             }
         }
 
