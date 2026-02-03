@@ -41,6 +41,8 @@ namespace Movie_AnimeQuizApp.Views {
         private static readonly ConcurrentDictionary<string, BitmapImage> _imgCache
             = new ConcurrentDictionary<string, BitmapImage>();
 
+        private const string InstructionLine = "〇になっている単語を選択肢から選べ。";
+
         public QuizPlayWindow(QuizSession session) {
             InitializeComponent();
 
@@ -182,7 +184,12 @@ namespace Movie_AnimeQuizApp.Views {
                 }
             }
 
-            try { QuestionText.Text = _currentQuiz.Question ?? ""; } catch { }
+            try {
+                string q = _currentQuiz.Question ?? "";
+                q = EnsureNewlineAfterInstruction(q);
+                QuestionText.Text = q;
+            }
+            catch { }
 
             _currentChoices = await AppDb.Connection.Table<Choice>()
                 .Where(c => c.QuizId == _currentQuiz.QuizId)
@@ -193,6 +200,61 @@ namespace Movie_AnimeQuizApp.Views {
             SetChoiceButton(ChoiceBtn1, _currentChoices, 0);
             SetChoiceButton(ChoiceBtn2, _currentChoices, 1);
             SetChoiceButton(ChoiceBtn3, _currentChoices, 2);
+        }
+
+        private static string EnsureNewlineAfterInstruction(string text) {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            int idx = text.IndexOf(InstructionLine, StringComparison.Ordinal);
+            if (idx < 0) return text;
+
+            int pos = idx + InstructionLine.Length;
+
+            // 末尾なら空行を作る（改行2回）
+            if (pos >= text.Length) {
+                string nlEnd = text.Contains("\r\n") ? "\r\n" : "\n";
+                return text + nlEnd + nlEnd;
+            }
+
+            // 指示文の直後のスペース/タブはスキップ
+            int p = pos;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+
+            // 使う改行コード（基本は既存に合わせる）
+            string nl = text.Contains("\r\n") ? "\r\n" : "\n";
+
+            // 直後の改行数（行区切り数）を数える：\r\n は1回としてカウント
+            int breaks = 0;
+            int scan = p;
+            int afterFirstBreak = p;
+
+            while (scan < text.Length && breaks < 2) {
+                if (text[scan] == '\r') {
+                    if (scan + 1 < text.Length && text[scan + 1] == '\n') scan += 2;
+                    else scan += 1;
+                    breaks++;
+                    if (breaks == 1) afterFirstBreak = scan;
+                    continue;
+                }
+                if (text[scan] == '\n') {
+                    scan += 1;
+                    breaks++;
+                    if (breaks == 1) afterFirstBreak = scan;
+                    continue;
+                }
+                break;
+            }
+
+            // すでに空行あり（改行が2回以上）なら何もしない
+            if (breaks >= 2) return text;
+
+            // 改行なし → 改行2回入れて空行を作る
+            if (breaks == 0) {
+                return text.Insert(p, nl + nl);
+            }
+
+            // 改行1回だけ → もう1回足して空行を作る
+            return text.Insert(afterFirstBreak, nl);
         }
 
         private void SetChoiceButton(Button btn, List<Choice> choices, int index) {
