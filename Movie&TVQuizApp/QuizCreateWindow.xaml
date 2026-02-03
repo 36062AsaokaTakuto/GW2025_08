@@ -186,9 +186,11 @@
                              Foreground="Gray"
                              VerticalScrollBarVisibility="Auto"
                              FontSize="25"
-                             Height="450"
+                             Height="380"
                              GotFocus="Question_GotFocus"
-                             LostFocus="Question_LostFocus"/>
+                             LostFocus="Question_LostFocus"          
+                            ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
                     </Border>
                 </StackPanel>
 
