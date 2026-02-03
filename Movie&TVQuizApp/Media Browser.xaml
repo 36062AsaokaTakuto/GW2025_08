@@ -191,26 +191,48 @@
                     </Button.Style>
                 </Button>
 
-                <!-- LoadMoreカード -->
+                <!-- LoadMoreカード（作品カードと同じ縦横） -->
                 <Button x:Name="LoadMoreBtn"
-                        Click="LoadMore_Click"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Padding="0"
-                        HorizontalAlignment="Stretch"
-                        VerticalAlignment="Top">
+        Click="LoadMore_Click"
+        Background="Transparent"
+        BorderThickness="0"
+        Padding="0"
+        HorizontalAlignment="Stretch"
+        VerticalAlignment="Top">
                     <Border Background="#151515"
-                            BorderBrush="#2A2A2A"
-                            BorderThickness="1"
-                            CornerRadius="14"
-                            Height="470">
-                        <Grid>
-                            <TextBlock Text="さらに読み込む"
-                                       Foreground="White"
-                                       FontSize="22"
-                                       FontWeight="Bold"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"/>
+            BorderBrush="#2A2A2A"
+            BorderThickness="1"
+            CornerRadius="14"
+            Height="470"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Top">
+                        <Grid ClipToBounds="False">
+                            <!-- 作品カードと同じ比率（上260/下*） -->
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="260"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 上（画像枠と同じ） -->
+                            <Border Grid.Row="0"
+                    CornerRadius="14,14,0,0"
+                    ClipToBounds="True"
+                    Background="Black"/>
+
+                            <!-- 下（タイトル枠と同じ） -->
+                            <Border Grid.Row="1"
+                    Background="#141414"
+                    CornerRadius="0,0,14,14"
+                    Padding="12,54,12,14"/>
+
+                            <!-- 表示は1つだけ -->
+                            <TextBlock Grid.RowSpan="2"
+                       Text="さらに読み込む"
+                       Foreground="White"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
 
@@ -225,6 +247,8 @@
                         </Style>
                     </Button.Style>
                 </Button>
+
+
 
             </Grid>
         </DataTemplate>
@@ -578,20 +602,44 @@
 
             <!-- 一覧 -->
             <ScrollViewer Grid.Row="1"
-                          HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Items}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Columns="8"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
+              HorizontalScrollBarVisibility="Disabled"
+              VerticalScrollBarVisibility="Auto">
+                <StackPanel>
 
-                    <ItemsControl.ItemTemplate>
-                        <StaticResource ResourceKey="BrowserItemTemplate"/>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    <!-- 一覧（今まで通り） -->
+                    <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="8"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <ItemsControl.ItemTemplate>
+                            <StaticResource ResourceKey="BrowserItemTemplate"/>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- ★横長の「さらに読み込む」 -->
+                    <Button x:Name="LoadMoreBar"
+                Click="LoadMore_Click"
+                Visibility="Collapsed"
+                Background="#151515"
+                Foreground="White"
+                FontSize="22"
+                FontWeight="Bold"
+                BorderBrush="#2A2A2A"
+                BorderThickness="1"
+                Height="78"
+                Margin="6,10,6,18"
+                HorizontalAlignment="Stretch"
+                Cursor="Hand"
+                Padding="0">
+                        さらに読み込む
+                    </Button>
+
+                </StackPanel>
             </ScrollViewer>
+
 
         </Grid>
     </Grid>

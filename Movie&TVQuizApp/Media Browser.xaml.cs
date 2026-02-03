@@ -812,6 +812,9 @@ namespace Movie_AnimeQuizApp {
 
             Items.Clear();
 
+            SetLoadMoreBarVisible(false);
+
+
             _apiPage = 1;
             _apiTotalPages = int.MaxValue;
 
@@ -824,25 +827,34 @@ namespace Movie_AnimeQuizApp {
             await AppendNextChunkAsync(token);
         }
 
+        private void SetLoadMoreBarVisible(bool visible) {
+            if (LoadMoreBar == null) return;
+            LoadMoreBar.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+
         private async void LoadMore_Click(object sender, RoutedEventArgs e) {
             if (_cts == null) return;
 
             RemoveLoadMoreCard();
+            if (LoadMoreBar != null) LoadMoreBar.IsEnabled = false;
+
             await AppendNextChunkAsync(_cts.Token);
+
+            if (LoadMoreBar != null) LoadMoreBar.IsEnabled = true;
         }
 
+
         private void RemoveLoadMoreCard() {
-            BrowserRow last = Items.LastOrDefault();
-            if (last != null && last.IsLoadMore) Items.Remove(last);
+            // もうカードとしては出さず、横長ボタンを一旦隠す
+            SetLoadMoreBarVisible(false);
         }
 
         private void AddLoadMoreCardIfHasMore() {
-            BrowserRow last = Items.LastOrDefault();
-            if (last != null && last.IsLoadMore) return;
-
             bool hasMore = (_bufferIndex < _buffer.Count) || (_apiPage <= _apiTotalPages);
-            if (hasMore) Items.Add(BrowserRow.LoadMore());
+            SetLoadMoreBarVisible(hasMore);
         }
+
 
         private async Task FillBufferIfNeededAsync(CancellationToken token) {
             if (token.IsCancellationRequested) return;
@@ -1228,5 +1240,6 @@ namespace Movie_AnimeQuizApp {
             double rad = angleDeg * Math.PI / 180.0;
             return new Point(cx + r * Math.Cos(rad), cy + r * Math.Sin(rad));
         }
+
     }
 }
