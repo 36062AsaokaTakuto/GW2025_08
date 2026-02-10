@@ -144,7 +144,7 @@
                          Foreground="White"
                          SelectionMode="Single"
                          HorizontalContentAlignment="Stretch"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.ItemTemplate>
                         <!-- ★横長レイアウト -->
