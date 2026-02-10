@@ -1,5 +1,7 @@
-﻿// MediaBrowser.xaml.cs（全体）
-// 目的：クイズ検索ボックス表示までは下を押し下げ、候補リストはPopupで重ねて表示（下を押し下げない）
+﻿// MediaBrowser.xaml.cs
+// ※「クイズしたい作品名を入力」が空欄のとき、1回クリックだけで候補が出るように（MainWindowと同じ流れ）
+// ※「人気/上映中/放送中」押下時は必ず一覧を最上部へ
+// ※それ以外は変更しない
 
 using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
@@ -62,10 +64,46 @@ namespace Movie_AnimeQuizApp {
             DependencyProperty.Register("CardWidth", typeof(double), typeof(MediaBrowser),
                 new PropertyMetadata(200.0));
 
-        // ===== ★クイズ候補（DBにある「クイズが存在する作品」）=====
+        // =====================================================
+        // ★かな/幅/大小を無視して比較（MainWindowと同じ）
+        // =====================================================
+        private static readonly CompareInfo _jaComp = CultureInfo.GetCultureInfo("ja-JP").CompareInfo;
+        private const CompareOptions _jaOpt =
+            CompareOptions.IgnoreCase |
+            CompareOptions.IgnoreKanaType |
+            CompareOptions.IgnoreWidth;
+
+        private static bool JaContains(string src, string q) {
+            src = src ?? "";
+            q = q ?? "";
+            if (q.Length == 0) return true;
+            return _jaComp.IndexOf(src, q, _jaOpt) >= 0;
+        }
+
+        private static bool JaStartsWith(string src, string q) {
+            src = src ?? "";
+            q = q ?? "";
+            if (q.Length == 0) return true;
+            return _jaComp.IsPrefix(src, q, _jaOpt);
+        }
+
+        // =========================================================
+        // ★クイズ候補（DBにある「クイズが存在する作品」）: インデックスを1回だけ読み込み
+        // =========================================================
         private readonly ObservableCollection<QuizWorkSuggestItem> _quizWorkSuggestions
             = new ObservableCollection<QuizWorkSuggestItem>();
-        private CancellationTokenSource _ctsQuizWorkSuggest;
+
+        private readonly SemaphoreSlim _quizIndexGate = new SemaphoreSlim(1, 1);
+        private volatile bool _quizIndexLoaded = false;
+        private List<QuizSuggestRow> _quizIndex = new List<QuizSuggestRow>();
+
+        private readonly DispatcherTimer _quizSuggestDebounceTimer = new DispatcherTimer();
+        private CancellationTokenSource _ctsQuizSuggest;
+        private string _pendingQuizSuggestQuery = "";
+        private long _quizSuggestSeq = 0;
+
+        // ★候補クリックでTextを入れる時、TextChangedから候補再検索を発火させない
+        private bool _suppressQuizSuggest = false;
 
         public enum BrowseMode {
             MoviePopular,
@@ -90,6 +128,17 @@ namespace Movie_AnimeQuizApp {
             // ★クイズ候補ListBoxのItemsSource
             if (QuizWorkSuggestList != null) {
                 QuizWorkSuggestList.ItemsSource = _quizWorkSuggestions;
+
+                // ★「3件くらいしか見えない」対策：MainWindowに近い表示量（約10件分見える高さ）
+                // （XAMLは触らず、コードで設定）
+                QuizWorkSuggestList.MaxHeight = 900;
+
+                // ★候補クリックを確実に拾う（handledでも拾う）
+                QuizWorkSuggestList.AddHandler(
+                    UIElement.PreviewMouseLeftButtonUpEvent,
+                    new MouseButtonEventHandler(QuizWorkSuggestList_PreviewMouseLeftButtonUp),
+                    true
+                );
             }
 
             Genres.Clear();
@@ -101,7 +150,7 @@ namespace Movie_AnimeQuizApp {
 
             Closing += (_, __) => {
                 try { _cts?.Cancel(); } catch { }
-                try { _ctsQuizWorkSuggest?.Cancel(); } catch { }
+                try { _ctsQuizSuggest?.Cancel(); } catch { }
                 try { _imgGate.Dispose(); } catch { }
             };
 
@@ -109,6 +158,14 @@ namespace Movie_AnimeQuizApp {
             _menuHideTimer.Tick += (_, __) => {
                 _menuHideTimer.Stop();
                 HideMenus();
+            };
+
+            // ★クイズ候補（デバウンス）
+            _quizSuggestDebounceTimer.Interval = TimeSpan.FromMilliseconds(260);
+            _quizSuggestDebounceTimer.Tick += async (_, __) => {
+                _quizSuggestDebounceTimer.Stop();
+                string qtext = _pendingQuizSuggestQuery;
+                await RunQuizWorkSuggestAsync(qtext);
             };
 
             InitQuizHeader();
@@ -153,6 +210,8 @@ namespace Movie_AnimeQuizApp {
         // ★カードクリック：ID指定で確実に同じ作品へ
         // =========================================================
         private void MediaCard_Click(object sender, RoutedEventArgs e) {
+            ClearQuizSearchUi();
+
             FrameworkElement fe = sender as FrameworkElement;
             BrowserRow row = fe != null ? fe.DataContext as BrowserRow : null;
             if (row == null || row.IsLoadMore || row.Media == null) return;
@@ -174,6 +233,7 @@ namespace Movie_AnimeQuizApp {
         // Home（確実にMainだけにする）
         // =========================================================
         private void Home_Click(object sender, RoutedEventArgs e) {
+            ClearQuizSearchUi();
             AppNav.GoHome(this);
         }
 
@@ -183,16 +243,20 @@ namespace Movie_AnimeQuizApp {
         private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e) {
             DependencyObject src = e.OriginalSource as DependencyObject;
 
-            // TextBox外クリックでフォーカス解除
+            // ★重要：入力欄内判定を TextBox ではなく「Border全体」にする（MainWindowと同じ体感）
+            bool inQuizInputArea =
+                (src != null && QuizSearchBoxBorder != null && IsDescendant(src, QuizSearchBoxBorder));
+
+            // TextBox外クリックでフォーカス解除（ただし入力欄Border内は外扱いにしない）
             if (QuizSearchTextBox != null && QuizSearchTextBox.IsKeyboardFocusWithin) {
-                if (src == null || !IsDescendant(src, QuizSearchTextBox)) {
+                if (!inQuizInputArea) {
                     Keyboard.ClearFocus();
                 }
             }
 
-            // ★候補Popup外クリックで閉じる
+            // ★候補Popup外クリックで閉じる（ただし入力欄Border内は外扱いにしない）
             if (QuizWorkSuggestPopup != null && QuizWorkSuggestPopup.IsOpen) {
-                bool insideQuizBox = (QuizSearchTextBox != null && src != null && IsDescendant(src, QuizSearchTextBox));
+                bool insideQuizBox = inQuizInputArea;
                 bool insideQuizSuggest = (src != null && QuizWorkSuggestBorder != null && IsDescendant(src, QuizWorkSuggestBorder));
                 if (!insideQuizBox && !insideQuizSuggest) {
                     HideQuizWorkSuggest();
@@ -206,6 +270,19 @@ namespace Movie_AnimeQuizApp {
                 if (cur == ancestor) return true;
                 cur = VisualTreeHelper.GetParent(cur);
             }
+            return false;
+        }
+
+        private bool IsInQuizSuggestArea(DependencyObject src) {
+            if (src == null) return false;
+
+            if (QuizWorkSuggestList != null && IsDescendant(src, QuizWorkSuggestList)) return true;
+
+            if (QuizWorkSuggestPopup != null) {
+                var child = QuizWorkSuggestPopup.Child as DependencyObject;
+                if (child != null && IsDescendant(src, child)) return true;
+            }
+
             return false;
         }
 
@@ -313,6 +390,97 @@ namespace Movie_AnimeQuizApp {
             HideQuizWorkSuggest();
         }
 
+        // =========================================================
+        // ★追加：入力欄BorderのPadding部分クリックでも「1回で」候補を出す
+        // =========================================================
+        private void QuizSearchBoxBorder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) {
+            if (QuizSearchTextBox == null) return;
+
+            // TextBox自体をクリックした場合は、TextBox側の既存処理に任せる（余計な変更をしない）
+            var src = e.OriginalSource as DependencyObject;
+            if (src != null && IsDescendant(src, QuizSearchTextBox)) return;
+
+            CancelMenuHide();
+            if (QuizMenu != null) QuizMenu.Visibility = Visibility.Visible;
+            if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Visible;
+
+            if (!QuizSearchTextBox.IsKeyboardFocusWithin) {
+                e.Handled = true;
+                QuizSearchTextBox.Focus();
+            }
+
+            QuizSearchTextBox.IsReadOnlyCaretVisible = true;
+
+            // ★フォーカス反映後に必ず判定（1回で出る）
+            Dispatcher.BeginInvoke(new Action(() => {
+                ShowQuizSuggestAllIfEmptyAndFocused();
+            }), DispatcherPriority.Input);
+        }
+
+        // =========================================================
+        // ★MainWindowと同じ：「空欄クリック/空欄フォーカス時だけ登録済み候補を出す」
+        // =========================================================
+        private void ShowQuizSuggestAllIfEmptyAndFocused() {
+            if (QuizSearchTextBox == null) return;
+
+            if (!(QuizSearchTextBox.IsKeyboardFocusWithin || QuizSearchTextBox.IsFocused)) return;
+            if (!string.IsNullOrWhiteSpace(QuizSearchTextBox.Text)) return;
+
+            _ = RunQuizSuggestEmptyAsync();
+        }
+
+        private async Task RunQuizSuggestEmptyAsync() {
+            long mySeq = Interlocked.Increment(ref _quizSuggestSeq);
+
+            try { _quizSuggestDebounceTimer.Stop(); } catch { }
+            _pendingQuizSuggestQuery = "";
+
+            if (_ctsQuizSuggest != null) _ctsQuizSuggest.Cancel();
+            _ctsQuizSuggest = new CancellationTokenSource();
+            var token = _ctsQuizSuggest.Token;
+
+            try {
+                await EnsureQuizIndexAsync(token);
+                if (token.IsCancellationRequested) return;
+                if (mySeq != _quizSuggestSeq) return;
+
+                var src = _quizIndex;
+
+                var list = await Task.Run(() => {
+                    return src
+                        .Where(r => r != null && !string.IsNullOrWhiteSpace(r.Title))
+                        .OrderBy(r => r.Title, StringComparer.CurrentCulture)
+                        .Select(r => new QuizWorkSuggestItem {
+                            WorkKey = r.WorkKey ?? "",
+                            Title = r.Title ?? "",
+                            PosterThumbUrl = BuildPosterThumbUrlFromStoredPath(r.PosterPath),
+                            Sub = "クイズ数: " + r.QuizCount.ToString()
+                        })
+                        .ToList();
+                }, token);
+
+                if (token.IsCancellationRequested) return;
+                if (mySeq != _quizSuggestSeq) return;
+
+                await Dispatcher.InvokeAsync(() => {
+                    if (mySeq != _quizSuggestSeq) return;
+
+                    if (QuizSearchTextBox == null) return;
+                    if (!(QuizSearchTextBox.IsKeyboardFocusWithin || QuizSearchTextBox.IsFocused)) return;
+                    if (!string.IsNullOrWhiteSpace(QuizSearchTextBox.Text)) return;
+
+                    _quizWorkSuggestions.Clear();
+                    for (int i = 0; i < list.Count; i++) _quizWorkSuggestions.Add(list[i]);
+
+                    if (_quizWorkSuggestions.Count > 0) ShowQuizWorkSuggest();
+                    else HideQuizWorkSuggest();
+                });
+            }
+            catch {
+                await Dispatcher.InvokeAsync(() => HideQuizWorkSuggest());
+            }
+        }
+
         // ★XAMLが呼んでるので必須
         private void QuizSearch_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) {
             if (QuizSearchTextBox == null) return;
@@ -325,6 +493,10 @@ namespace Movie_AnimeQuizApp {
                 e.Handled = true;
                 QuizSearchTextBox.Focus();
             }
+
+            Dispatcher.BeginInvoke(new Action(() => {
+                ShowQuizSuggestAllIfEmptyAndFocused();
+            }), DispatcherPriority.Input);
         }
 
         // ★XAMLが呼んでるので必須
@@ -336,6 +508,10 @@ namespace Movie_AnimeQuizApp {
             if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Visible;
 
             QuizSearchTextBox.IsReadOnlyCaretVisible = true;
+
+            Dispatcher.BeginInvoke(new Action(() => {
+                ShowQuizSuggestAllIfEmptyAndFocused();
+            }), DispatcherPriority.Input);
         }
 
         // ★XAMLが呼んでるので必須
@@ -343,16 +519,34 @@ namespace Movie_AnimeQuizApp {
             if (QuizSearchTextBox == null) return;
 
             QuizSearchTextBox.IsReadOnlyCaretVisible = false;
+
+            var fe = Keyboard.FocusedElement as DependencyObject;
+            if (fe == null || !IsInQuizSuggestArea(fe)) {
+                HideQuizWorkSuggest();
+            }
+
             ScheduleMenuHide();
         }
 
         // ★XAMLが呼んでるので必須
         private void QuizSearch_TextChanged(object sender, TextChangedEventArgs e) {
             if (QuizSearchTextBox == null) return;
+            if (_suppressQuizSuggest) return;
+
             if (QuizSearchTextBox.IsKeyboardFocusWithin) CancelMenuHide();
 
-            // ★候補を更新（ひらがな/カタカナ/大小文字対応）
-            StartQuizWorkSuggestDebounce((QuizSearchTextBox.Text ?? "").Trim());
+            string queryText = (QuizSearchTextBox.Text ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(queryText)) {
+                if (QuizSearchTextBox.IsKeyboardFocusWithin || QuizSearchTextBox.IsFocused) {
+                    ShowQuizSuggestAllIfEmptyAndFocused();
+                } else {
+                    HideQuizWorkSuggest();
+                }
+                return;
+            }
+
+            StartQuizWorkSuggestDebounce(queryText);
         }
 
         // ★XAMLが呼んでるので必須
@@ -372,58 +566,25 @@ namespace Movie_AnimeQuizApp {
 
         // ★XAMLが呼んでるので必須（クイズ開始ボタン）
         private async void QuizSearchHit_Click(object sender, RoutedEventArgs e) {
-            // まずUI（パネル表示＆フォーカス）
+            CancelMenuHide();
+            if (QuizMenu != null) QuizMenu.Visibility = Visibility.Visible;
+
             if (QuizSearchPanel != null && QuizSearchPanel.Visibility != Visibility.Visible) {
                 ShowQuizSearchPanel();
             }
 
             if (QuizSearchTextBox != null && !QuizSearchTextBox.IsKeyboardFocusWithin) {
                 QuizSearchTextBox.Focus();
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
             }
 
-            // 入力欄の文字（空なら何もしない）
             string title = (QuizSearchTextBox?.Text ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(title)) return;
+            if (string.IsNullOrWhiteSpace(title)) {
+                ShowQuizSuggestAllIfEmptyAndFocused();
+                return;
+            }
 
-            await AppDb.InitAsync();
-
-            // ★完全一致で検索
-            Work work = await AppDb.Connection.Table<Work>()
-                .Where(w => w.Title == title)
-                .FirstOrDefaultAsync();
-
-            if (work == null) return;
-
-            // その作品のクイズ数
-            var quizzes = await AppDb.Connection.Table<Quiz>()
-                .Where(q => q.WorkKey == work.WorkKey)
-                .ToListAsync();
-
-            if (quizzes == null || quizzes.Count == 0) return;
-
-            int firstQuizId = quizzes.OrderBy(q => q.QuizId).First().QuizId;
-
-            // ★候補を閉じる
-            HideQuizWorkSuggest();
-
-            // クイズ回答画面へ（全画面）
-            var win = new Movie_AnimeQuizApp.Views.QuizPlayWindow(work.WorkKey, firstQuizId);
-            win.Owner = this;
-            win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            win.WindowState = WindowState.Maximized;
-
-            // メニュー/パネルを閉じる
-            if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
-            if (QuizMenu != null) QuizMenu.Visibility = Visibility.Collapsed;
-
-            this.Hide();
-            win.Closed += (_, __) => {
-                if (AppNav.ForceMain) return;
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            win.Show();
-            win.WindowState = WindowState.Maximized; // ★保険（確実に最大化）
+            await TryStartQuizAsync();
         }
 
         // ★クイズが無いなら何もしない（画面遷移しない）
@@ -440,176 +601,137 @@ namespace Movie_AnimeQuizApp {
             if (work == null) return;
 
             List<Quiz> quizzes = await AppDb.Connection.Table<Quiz>()
-                .Where(q => q.WorkKey == work.WorkKey)
+                .Where(qq => qq.WorkKey == work.WorkKey)
                 .ToListAsync();
 
             if (quizzes == null || quizzes.Count <= 0) return;
 
-            int firstQuizId = quizzes.OrderBy(x => Guid.NewGuid()).First().QuizId;
+            int firstQuizId = quizzes.OrderBy(x => x.QuizId).First().QuizId;
 
             HideQuizWorkSuggest();
 
-            var win = new Movie_AnimeQuizApp.Views.QuizPlayWindow(work.WorkKey, firstQuizId);
-            win.Owner = this;
-            win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            win.WindowState = WindowState.Maximized;
-
-            if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
-            if (QuizMenu != null) QuizMenu.Visibility = Visibility.Collapsed;
-
-            this.Hide();
-            win.Closed += (_, __) => {
-                if (AppNav.ForceMain) return;
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            win.Show();
-            win.WindowState = WindowState.Maximized; // ★保険
-        }
-
-        // ★XAMLが呼んでるので必須（クイズ作成）
-        private void QuizCreate_Click(object sender, RoutedEventArgs e) {
-            HideMenus();
-
-            Window w = CreateWindowByTypeNames(new string[] {
-                "Movie_AnimeQuizApp.Views.QuizCreateWindow",
-                "Movie_AnimeQuizApp.QuizCreateWindow",
-                "Movie_AnimeQuizApp.QuizCreate",
-                "Movie_AnimeQuizApp.QuizCreatePage"
-            });
-
-            if (w == null) { 
-                return;
-            }
-
-            w.Owner = this;
-            w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-            this.Hide();
-            w.Closed += (_, __) => {
-                if (AppNav.ForceMain) return;
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            w.WindowState = WindowState.Maximized;
-            w.Show();
-        }
-
-        private Window CreateWindowByTypeNames(string[] fullNames) {
-            try {
-                var asm = Assembly.GetExecutingAssembly();
-                for (int i = 0; i < fullNames.Length; i++) {
-                    var t = asm.GetType(fullNames[i], false);
-                    if (t == null) continue;
-                    if (!typeof(Window).IsAssignableFrom(t)) continue;
-
-                    var obj = Activator.CreateInstance(t);
-                    return obj as Window;
-                }
-            }
-            catch { }
-            return null;
+            await OpenQuizPlayByWorkKeyAsync(work.WorkKey);
         }
 
         // =========================================================
-        // ★クイズ候補（DB：クイズが存在する作品）表示/取得
+        // ★クイズ候補クリックを確実に拾う（Preview）
         // =========================================================
-        private void StartQuizWorkSuggestDebounce(string q) {
-            if (string.IsNullOrWhiteSpace(q)) {
-                HideQuizWorkSuggest();
-                return;
-            }
+        private async void QuizWorkSuggestList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) {
+            if (QuizWorkSuggestList == null) return;
 
-            try { _ctsQuizWorkSuggest?.Cancel(); } catch { }
-            _ctsQuizWorkSuggest = new CancellationTokenSource();
-            var token = _ctsQuizWorkSuggest.Token;
+            var dep = e.OriginalSource as DependencyObject;
+            if (dep == null) return;
 
-            _ = Task.Run(async () => {
-                try {
-                    await Task.Delay(220, token);
-                    if (token.IsCancellationRequested) return;
+            var lbi = ItemsControl.ContainerFromElement(QuizWorkSuggestList, dep) as ListBoxItem;
+            var it = (lbi != null) ? (lbi.DataContext as QuizWorkSuggestItem) : null;
+            if (it == null) return;
 
-                    var list = await FetchQuizWorkSuggestionsAsync(q, token);
-                    if (token.IsCancellationRequested) return;
-
-                    await Dispatcher.InvokeAsync(() => {
-                        _quizWorkSuggestions.Clear();
-                        for (int i = 0; i < list.Count; i++) _quizWorkSuggestions.Add(list[i]);
-
-                        if (_quizWorkSuggestions.Count > 0) ShowQuizWorkSuggest();
-                        else HideQuizWorkSuggest();
-                    });
-                }
-                catch { }
-            });
+            e.Handled = true;
+            await OpenQuizPlayByWorkKeyAsync(it.WorkKey);
         }
 
-        private async Task<List<QuizWorkSuggestItem>> FetchQuizWorkSuggestionsAsync(string query, CancellationToken token) {
-            var ret = new List<QuizWorkSuggestItem>();
+        // =========================================================
+        // ★クイズ候補（DB：クイズが存在する作品）表示/取得（インデックス1回読み込み→メモリ検索）
+        // =========================================================
+        private void StartQuizWorkSuggestDebounce(string queryText) {
+            _pendingQuizSuggestQuery = (queryText ?? "").Trim();
+            _quizSuggestDebounceTimer.Stop();
+            _quizSuggestDebounceTimer.Start();
+        }
 
+        private async Task EnsureQuizIndexAsync(CancellationToken token) {
+            if (_quizIndexLoaded) return;
+
+            await _quizIndexGate.WaitAsync(token);
             try {
+                if (_quizIndexLoaded) return;
+
                 await AppDb.InitAsync();
+                if (token.IsCancellationRequested) return;
 
-                // Quiz側（どの作品にクイズがあるか）
-                var quizList = await AppDb.Connection.Table<Quiz>().ToListAsync();
-                if (quizList == null || quizList.Count == 0) return ret;
-
-                var hasQuizKeys = new HashSet<string>(
-                    quizList.Where(q => q != null && !string.IsNullOrWhiteSpace(q.WorkKey))
-                            .Select(q => q.WorkKey)
+                var rows = await AppDb.Connection.QueryAsync<QuizSuggestRow>(
+                    "SELECT w.WorkKey as WorkKey, w.Title as Title, w.PosterPath as PosterPath," +
+                    " (SELECT COUNT(1) FROM Quiz q WHERE q.WorkKey = w.WorkKey) AS QuizCount" +
+                    " FROM [Work] w" +
+                    " WHERE EXISTS (SELECT 1 FROM Quiz q2 WHERE q2.WorkKey = w.WorkKey)" +
+                    " ORDER BY w.Title COLLATE NOCASE"
                 );
 
-                if (hasQuizKeys.Count == 0) return ret;
-
-                // Work側（タイトル/ポスター等）
-                var works = await AppDb.Connection.Table<Work>().ToListAsync();
-                if (works == null || works.Count == 0) return ret;
-
-                string nq = Normalize(query);
-
-                for (int i = 0; i < works.Count; i++) {
-                    if (token.IsCancellationRequested) break;
-
-                    var w = works[i];
-                    if (w == null) continue;
-
-                    string wk = w.WorkKey ?? "";
-                    if (wk.Length == 0) continue;
-                    if (!hasQuizKeys.Contains(wk)) continue;
-
-                    string title = w.Title ?? "";
-                    if (title.Length == 0) continue;
-
-                    string nt = Normalize(title);
-                    if (!(nt.StartsWith(nq) || nt.Contains(nq))) continue;
-
-                    string mt = (w.MediaType ?? "");
-                    string dateText = ToJaDate(w.ReleaseDate ?? "");
-
-                    string sub = (mt == "movie" ? "映画" : (mt == "tv" ? "テレビ番組" : ""))
-                               + (string.IsNullOrWhiteSpace(dateText) ? "" : " ・ " + dateText);
-
-                    ret.Add(new QuizWorkSuggestItem {
-                        WorkKey = wk,
-                        Title = title,
-                        Sub = sub,
-                        PosterThumbUrl = BuildPosterThumbUrlFromStoredPath(w.PosterPath),
-                        NormTitle = nt,
-                        NormQuery = nq
-                    });
-                }
-
-                // 表示順：先頭一致→タイトル昇順、最大10件
-                ret = ret
-                    .OrderByDescending(s => s.NormTitle.StartsWith(s.NormQuery))
-                    .ThenBy(s => s.Title, StringComparer.CurrentCulture)
-                    .Take(10)
-                    .ToList();
-
-                return ret;
+                _quizIndex = rows ?? new List<QuizSuggestRow>();
+                _quizIndexLoaded = true;
             }
             catch {
-                return ret;
+                _quizIndex = new List<QuizSuggestRow>();
+                _quizIndexLoaded = true;
+            }
+            finally {
+                _quizIndexGate.Release();
+            }
+        }
+
+        private async Task RunQuizWorkSuggestAsync(string queryText) {
+            long mySeq = Interlocked.Increment(ref _quizSuggestSeq);
+
+            if (_ctsQuizSuggest != null) _ctsQuizSuggest.Cancel();
+            _ctsQuizSuggest = new CancellationTokenSource();
+            var token = _ctsQuizSuggest.Token;
+
+            queryText = (queryText ?? "").Trim();
+
+            try {
+                await EnsureQuizIndexAsync(token);
+                if (token.IsCancellationRequested) return;
+                if (mySeq != _quizSuggestSeq) return;
+
+                var src = _quizIndex;
+
+                var list = await Task.Run(() => {
+                    var ret = new List<QuizWorkSuggestItem>();
+
+                    for (int i = 0; i < src.Count; i++) {
+                        if (token.IsCancellationRequested) break;
+
+                        var r = src[i];
+                        if (r == null) continue;
+
+                        string title = r.Title ?? "";
+                        if (title.Length == 0) continue;
+
+                        if (!JaContains(title, queryText)) continue;
+
+                        ret.Add(new QuizWorkSuggestItem {
+                            WorkKey = r.WorkKey ?? "",
+                            Title = title,
+                            PosterThumbUrl = BuildPosterThumbUrlFromStoredPath(r.PosterPath),
+                            Sub = "クイズ数: " + r.QuizCount.ToString()
+                        });
+                    }
+
+                    return ret
+                        .OrderByDescending(x => JaStartsWith(x.Title, queryText))
+                        .ThenBy(x => x.Title, StringComparer.CurrentCulture)
+                        .ToList();
+                }, token);
+
+                if (token.IsCancellationRequested) return;
+                if (mySeq != _quizSuggestSeq) return;
+
+                await Dispatcher.InvokeAsync(() => {
+                    if (mySeq != _quizSuggestSeq) return;
+
+                    _quizWorkSuggestions.Clear();
+                    for (int i = 0; i < list.Count; i++) _quizWorkSuggestions.Add(list[i]);
+
+                    if (_quizWorkSuggestions.Count > 0 && QuizSearchTextBox != null &&
+                        (QuizSearchTextBox.IsKeyboardFocusWithin || QuizSearchTextBox.IsFocused)) {
+                        ShowQuizWorkSuggest();
+                    } else {
+                        HideQuizWorkSuggest();
+                    }
+                });
+            }
+            catch {
+                await Dispatcher.InvokeAsync(() => HideQuizWorkSuggest());
             }
         }
 
@@ -619,6 +741,9 @@ namespace Movie_AnimeQuizApp {
         }
 
         private void HideQuizWorkSuggest() {
+            try { _quizSuggestDebounceTimer.Stop(); } catch { }
+            _pendingQuizSuggestQuery = "";
+
             if (QuizWorkSuggestPopup != null) QuizWorkSuggestPopup.IsOpen = false;
             if (QuizWorkSuggestBorder != null) QuizWorkSuggestBorder.Visibility = Visibility.Collapsed;
 
@@ -626,21 +751,13 @@ namespace Movie_AnimeQuizApp {
             _quizWorkSuggestions.Clear();
         }
 
-        private void QuizWorkSuggestList_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) {
+        // ★XAMLが呼んでるので必須（バブル側：保険）
+        private async void QuizWorkSuggestList_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) {
             if (QuizWorkSuggestList == null) return;
-
             var it = QuizWorkSuggestList.SelectedItem as QuizWorkSuggestItem;
             if (it == null) return;
 
-            // ★クリックした候補を入れて、そのままクイズ回答へ
-            if (QuizSearchTextBox != null) {
-                QuizSearchTextBox.Text = it.Title ?? "";
-            }
-
-            HideQuizWorkSuggest();
-
-            // 既存の動線（完全一致でQuizPlayへ）
-            QuizSearchHit_Click(QuizSearchHit, new RoutedEventArgs());
+            await OpenQuizPlayByWorkKeyAsync(it.WorkKey);
         }
 
         private static string BuildPosterThumbUrlFromStoredPath(string posterPathOrUrl) {
@@ -652,59 +769,110 @@ namespace Movie_AnimeQuizApp {
                 return p;
             }
 
-            // Work.PosterPath が "/xxxx.jpg" 形式の想定
             if (!p.StartsWith("/")) p = "/" + p;
             return "https://image.tmdb.org/t/p/w92" + p;
         }
 
-        // ★ひらがな/カタカナ統一 + 半角/全角寄せ + 小文字/大文字無視
-        private static string Normalize(string s) {
-            if (s == null) return "";
-            s = s.Trim();
-
-            // 全角/半角などを寄せる
-            s = s.Normalize(NormalizationForm.FormKC);
-
-            // 小文字化（英字）
-            s = s.ToLowerInvariant();
-
-            // 空白除去
-            s = new string(s.Where(ch => !char.IsWhiteSpace(ch)).ToArray());
-
-            // カタカナ→ひらがな（タイトル側・クエリ側を同じルールにする）
-            var sb = new StringBuilder(s.Length);
-            for (int i = 0; i < s.Length; i++) {
-                char ch = s[i];
-
-                // 全角カタカナ範囲：ァ(30A1) ～ ヶ(30F6)
-                if (ch >= '\u30A1' && ch <= '\u30F6') {
-                    ch = (char)(ch - 0x60); // ひらがなへ
-                }
-                sb.Append(ch);
-            }
-
-            return sb.ToString();
-        }
-
-        private static string ToJaDate(string raw) {
-            if (string.IsNullOrWhiteSpace(raw)) return "";
-            DateTime dt;
-            if (DateTime.TryParseExact(raw, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out dt)) {
-                return dt.ToString("yyyy年M月d日", CultureInfo.GetCultureInfo("ja-JP"));
-            }
-            return raw;
-        }
-
-        // ★候補用Item
         private class QuizWorkSuggestItem {
             public string WorkKey { get; set; }
             public string Title { get; set; }
             public string Sub { get; set; }
             public string PosterThumbUrl { get; set; }
+        }
 
-            // ソート用
-            public string NormTitle { get; set; }
-            public string NormQuery { get; set; }
+        private class QuizSuggestRow {
+            public string WorkKey { get; set; }
+            public string Title { get; set; }
+            public string PosterPath { get; set; }
+            public int QuizCount { get; set; }
+        }
+
+        // =========================================================
+        // ★WorkKeyで直接クイズ回答へ（候補クリックで確実に遷移）
+        // =========================================================
+        private async Task OpenQuizPlayByWorkKeyAsync(string workKey) {
+            workKey = (workKey ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(workKey)) return;
+
+            try {
+                HideQuizWorkSuggest();
+
+                if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Collapsed;
+                if (QuizMenu != null) QuizMenu.Visibility = Visibility.Collapsed;
+
+                ClearQuizSearchUi();
+
+                await AppDb.InitAsync();
+
+                var quizzes = await AppDb.Connection.Table<Quiz>()
+                    .Where(qq => qq.WorkKey == workKey)
+                    .ToListAsync();
+
+                if (quizzes == null || quizzes.Count == 0) return;
+
+                int firstQuizId = quizzes.OrderBy(x => x.QuizId).First().QuizId;
+
+                Window quizWin = CreateQuizPlayWindowWindow(workKey, firstQuizId);
+                if (quizWin == null) return;
+
+                quizWin.Owner = this;
+
+                this.Hide();
+                quizWin.Closed += (_, __) => {
+                    if (AppNav.ForceMain) return;
+                    try { this.Show(); this.Activate(); } catch { }
+                };
+
+                quizWin.WindowState = WindowState.Maximized;
+                quizWin.Show();
+            }
+            catch {
+            }
+        }
+
+        private Window CreateQuizPlayWindowWindow(string workKey, int quizId) {
+            try {
+                var asm = Assembly.GetExecutingAssembly();
+                var t =
+                    asm.GetType("Movie_AnimeQuizApp.Views.QuizPlayWindow", false) ??
+                    asm.GetType("Movie_AnimeQuizApp.QuizPlayWindow", false);
+
+                if (t == null) return null;
+                if (!typeof(Window).IsAssignableFrom(t)) return null;
+
+                var ctor1 = t.GetConstructor(new Type[] { typeof(string) });
+                if (ctor1 != null) return (Window)ctor1.Invoke(new object[] { workKey });
+
+                var ctor2 = t.GetConstructor(new Type[] { typeof(string), typeof(int) });
+                if (ctor2 != null) return (Window)ctor2.Invoke(new object[] { workKey, quizId });
+
+                return null;
+            }
+            catch {
+                return null;
+            }
+        }
+
+        private void ClearQuizSearchUi() {
+            HideQuizWorkSuggest();
+
+            if (QuizSearchTextBox != null) {
+                _suppressQuizSuggest = true;
+                QuizSearchTextBox.Text = "";
+                _suppressQuizSuggest = false;
+
+                QuizSearchTextBox.IsReadOnlyCaretVisible = false;
+            }
+        }
+
+        // =========================================================
+        // ★追加：モード切替（人気/上映中/放送中）時は必ず最上部へ
+        // =========================================================
+        private void ScrollToTopIfPossible() {
+            try {
+                if (MainScrollViewer != null) MainScrollViewer.ScrollToTop();
+            }
+            catch { }
         }
 
         // =========================================================
@@ -716,6 +884,11 @@ namespace Movie_AnimeQuizApp {
         private async void TvOnAir_Click(object sender, RoutedEventArgs e) { await SetModeAsync(BrowseMode.TvOnAir); }
 
         private async Task SetModeAsync(BrowseMode mode) {
+            ClearQuizSearchUi();
+
+            // ★人気/上映中/放送中 押下で必ず最上部
+            ScrollToTopIfPossible();
+
             _mode = mode;
             HideMenus();
             ApplyModeTitle();
@@ -727,6 +900,11 @@ namespace Movie_AnimeQuizApp {
                 Genres[i].IsSelected = (Genres[i].Id == -1);
 
             await ResetAndLoadAsync();
+
+            // ★読み込み後も確実に最上部（レイアウト反映後）
+            await Dispatcher.InvokeAsync(() => {
+                ScrollToTopIfPossible();
+            }, DispatcherPriority.Background);
         }
 
         private void ApplyModeTitle() {
@@ -775,7 +953,6 @@ namespace Movie_AnimeQuizApp {
             foreach (GenreOption it in list.OrderBy(x => x.Name))
                 Genres.Add(it);
 
-            // 映画の「履歴」だけ消す（元コード踏襲）
             if (!IsMovieMode()) return;
 
             for (int i = Genres.Count - 1; i >= 0; i--) {
@@ -814,7 +991,6 @@ namespace Movie_AnimeQuizApp {
 
             SetLoadMoreBarVisible(false);
 
-
             _apiPage = 1;
             _apiTotalPages = int.MaxValue;
 
@@ -832,7 +1008,6 @@ namespace Movie_AnimeQuizApp {
             LoadMoreBar.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
 
-
         private async void LoadMore_Click(object sender, RoutedEventArgs e) {
             if (_cts == null) return;
 
@@ -844,9 +1019,7 @@ namespace Movie_AnimeQuizApp {
             if (LoadMoreBar != null) LoadMoreBar.IsEnabled = true;
         }
 
-
         private void RemoveLoadMoreCard() {
-            // もうカードとしては出さず、横長ボタンを一旦隠す
             SetLoadMoreBarVisible(false);
         }
 
@@ -854,7 +1027,6 @@ namespace Movie_AnimeQuizApp {
             bool hasMore = (_bufferIndex < _buffer.Count) || (_apiPage <= _apiTotalPages);
             SetLoadMoreBarVisible(hasMore);
         }
-
 
         private async Task FillBufferIfNeededAsync(CancellationToken token) {
             if (token.IsCancellationRequested) return;
@@ -1157,6 +1329,7 @@ namespace Movie_AnimeQuizApp {
         // クイズ削除（モーダルで前に出す）
         // =========================================================
         private void QuizDelete_Click(object sender, RoutedEventArgs e) {
+            ClearQuizSearchUi();
             HideMenus();
 
             Window w = CreateWindowByTypeNames(new string[] {
@@ -1173,8 +1346,52 @@ namespace Movie_AnimeQuizApp {
             w.Owner = this;
             w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
-            // ★後ろを消さない：Hideしない、モーダルで前に出す
             w.ShowDialog();
+        }
+
+        // ★XAMLが呼んでるので必須（クイズ作成）
+        private void QuizCreate_Click(object sender, RoutedEventArgs e) {
+            ClearQuizSearchUi();
+            HideMenus();
+
+            Window w = CreateWindowByTypeNames(new string[] {
+                "Movie_AnimeQuizApp.Views.QuizCreateWindow",
+                "Movie_AnimeQuizApp.QuizCreateWindow",
+                "Movie_AnimeQuizApp.QuizCreate",
+                "Movie_AnimeQuizApp.QuizCreatePage"
+            });
+
+            if (w == null) {
+                return;
+            }
+
+            w.Owner = this;
+            w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            this.Hide();
+            w.Closed += (_, __) => {
+                if (AppNav.ForceMain) return;
+                try { this.Show(); this.Activate(); } catch { }
+            };
+
+            w.WindowState = WindowState.Maximized;
+            w.Show();
+        }
+
+        private Window CreateWindowByTypeNames(string[] fullNames) {
+            try {
+                var asm = Assembly.GetExecutingAssembly();
+                for (int i = 0; i < fullNames.Length; i++) {
+                    var t = asm.GetType(fullNames[i], false);
+                    if (t == null) continue;
+                    if (!typeof(Window).IsAssignableFrom(t)) continue;
+
+                    var obj = Activator.CreateInstance(t);
+                    return obj as Window;
+                }
+            }
+            catch { }
+            return null;
         }
     }
 
@@ -1240,6 +1457,5 @@ namespace Movie_AnimeQuizApp {
             double rad = angleDeg * Math.PI / 180.0;
             return new Point(cx + r * Math.Cos(rad), cy + r * Math.Sin(rad));
         }
-
     }
 }

@@ -1141,7 +1141,6 @@ namespace Movie_AnimeQuizApp {
             }
         }
 
-
         private void SearchTextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) {
             UnpinQuizSearch();
             HideMenus();
@@ -1270,7 +1269,6 @@ namespace Movie_AnimeQuizApp {
                     .Where(s => JaContains(s.Title, query))
                     .OrderByDescending(s => JaStartsWith(s.Title, query))
                     .ThenBy(s => s.Title, StringComparer.CurrentCulture)
-                    .Take(10)
                     .ToArray();
 
                 return ordered;

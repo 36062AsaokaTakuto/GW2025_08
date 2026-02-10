@@ -1,4 +1,5 @@
-﻿using Movie_AnimeQuizApp.Data;
+﻿// QuizCreateWindow.xaml.cs（全体）
+using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Movie_AnimeQuizApp.Share;
 using Newtonsoft.Json.Linq;
@@ -16,13 +17,13 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Collections.Generic;
-using System.Globalization;   // ★追加
-using System.Text;          // ★追加
+using System.Globalization;
+using System.Text;
 
 namespace Movie_AnimeQuizApp.Views {
     public partial class QuizCreateWindow : Window {
         private const string ApiKey = "0fa85086e0e7e8c979d1ff066b894bf5";
-        private const string Placeholder = "クイズを作りたい作品を検索";
+        private const string Placeholder = "クイズを作りたい作品名を入力";
         private const string QuestionPlaceholder = "問題文を入力してください。";
 
         private const string TmdbPosterThumbBase = "https://image.tmdb.org/t/p/w92";
@@ -69,7 +70,6 @@ namespace Movie_AnimeQuizApp.Views {
             return _jaComp.IsPrefix(src, q, _jaOpt);
         }
 
-        // ★追加：検索クエリを「そのまま/ひら/カタ」に展開（TMDB用）
         private static string NormalizeNfkc(string s) =>
             (s ?? "").Normalize(NormalizationForm.FormKC);
 
@@ -77,7 +77,6 @@ namespace Movie_AnimeQuizApp.Views {
             s = NormalizeNfkc(s);
             var sb = new StringBuilder(s.Length);
             foreach (char ch in s) {
-                // カタカナ → ひらがな（ァ-ヶ 等）
                 if (ch >= '\u30A1' && ch <= '\u30F6') sb.Append((char)(ch - 0x60));
                 else sb.Append(ch);
             }
@@ -88,7 +87,6 @@ namespace Movie_AnimeQuizApp.Views {
             s = NormalizeNfkc(s);
             var sb = new StringBuilder(s.Length);
             foreach (char ch in s) {
-                // ひらがな → カタカナ（ぁ-ゖ 等）
                 if (ch >= '\u3041' && ch <= '\u3096') sb.Append((char)(ch + 0x60));
                 else sb.Append(ch);
             }
@@ -108,7 +106,6 @@ namespace Movie_AnimeQuizApp.Views {
                 if (!list.Any(s => string.Equals(s, x, StringComparison.Ordinal))) list.Add(x);
             }
 
-            // 優先順：そのまま → ひら → カタ
             Add(nfkc);
             Add(ToHiragana(nfkc));
             Add(ToKatakana(nfkc));
@@ -120,16 +117,16 @@ namespace Movie_AnimeQuizApp.Views {
             InitializeComponent();
 
             WorkSuggestList.ItemsSource = _workSuggestions;
+
             CorrectRadio1.IsChecked = true;
+            UpdateCorrectRadioLabels();
 
             WorkSearchTextBox.Text = Placeholder;
             WorkSearchTextBox.Foreground = Brushes.Gray;
 
-            // ★問題文プレースホルダー
             QuestionTextBox.Text = QuestionPlaceholder;
             QuestionTextBox.Foreground = Brushes.Gray;
 
-            // ★XAMLにイベントが付いていない場合でも動くようにコードで付与
             QuestionTextBox.GotFocus += Question_GotFocus;
             QuestionTextBox.LostFocus += Question_LostFocus;
         }
@@ -146,7 +143,8 @@ namespace Movie_AnimeQuizApp.Views {
 
             await AppDb.InitAsync();
 
-            CreatedByTextBox.Text = Environment.UserName;
+            // ★デフォルト文字（infosys等）が入らないように空にする
+            CreatedByTextBox.Text = "";
 
             ApplyWorkToUI(null);
 
@@ -154,9 +152,6 @@ namespace Movie_AnimeQuizApp.Views {
             _uiReady = true;
         }
 
-        // -------------------------
-        // 作品検索：プレースホルダー
-        // -------------------------
         private void WorkSearch_GotFocus(object sender, RoutedEventArgs e) {
             if (WorkSearchTextBox.Text == Placeholder) {
                 WorkSearchTextBox.Text = "";
@@ -171,9 +166,6 @@ namespace Movie_AnimeQuizApp.Views {
             }
         }
 
-        // -------------------------
-        // 問題文：プレースホルダー
-        // -------------------------
         private void Question_GotFocus(object sender, RoutedEventArgs e) {
             if (QuestionTextBox.Text == QuestionPlaceholder) {
                 QuestionTextBox.Text = "";
@@ -188,9 +180,6 @@ namespace Movie_AnimeQuizApp.Views {
             }
         }
 
-        // -------------------------
-        // 作品検索：TextChanged
-        // -------------------------
         private async void WorkSearchTextBox_TextChanged(object sender, TextChangedEventArgs e) {
             if (!_uiReady) return;
             if (WorkSuggestPopup == null) return;
@@ -223,14 +212,10 @@ namespace Movie_AnimeQuizApp.Views {
             }
         }
 
-        // =====================================================
-        // ★変更：TMDB検索を「そのまま/ひら/カタ」最大3回叩いてマージ
-        // =====================================================
         private async Task<TmdbSuggestItem[]> SearchTmdbAsync(string query, CancellationToken token) {
             var variants = BuildQueryVariants(query);
             if (variants.Count == 0) return Array.Empty<TmdbSuggestItem>();
 
-            // (mediaType:id)で重複排除
             var map = new Dictionary<string, TmdbSuggestItem>();
 
             for (int i = 0; i < variants.Count; i++) {
@@ -242,15 +227,14 @@ namespace Movie_AnimeQuizApp.Views {
                 for (int j = 0; j < part.Length; j++) {
                     var x = part[j];
                     string key = (x.MediaType ?? "") + ":" + x.TmdbId.ToString();
-                    if (!map.ContainsKey(key)) map[key] = x; // 先に入った（そのまま）を優先
+                    if (!map.ContainsKey(key)) map[key] = x;
                 }
             }
 
             var merged = map.Values
                 .Where(x => !string.IsNullOrWhiteSpace(x.Title))
-                // ★最後の絞り込み：ひら/カタ等を無視して一致
                 .Where(x => JaContains(x.Title, query))
-                .OrderByDescending(x => JaStartsWith(x.Title, query)) // prefix優先
+                .OrderByDescending(x => JaStartsWith(x.Title, query))
                 .ThenBy(x => x.Title, StringComparer.CurrentCulture)
                 .Take(50)
                 .ToArray();
@@ -258,7 +242,6 @@ namespace Movie_AnimeQuizApp.Views {
             return merged;
         }
 
-        // ★追加：TMDB検索 1回分（部品）
         private async Task<TmdbSuggestItem[]> SearchTmdbOnceAsync(string query, CancellationToken token) {
             string url =
                 "https://api.themoviedb.org/3/search/multi" +
@@ -372,7 +355,9 @@ namespace Movie_AnimeQuizApp.Views {
                 if (WorkSuggestPopup != null) WorkSuggestPopup.IsOpen = false;
 
                 ApplyWorkToUI(work);
-                ApplyOverviewToQuestionBox(work);
+
+                // ★概要は入れない
+                // ApplyOverviewToQuestionBox(work);
             }
             catch (OperationCanceledException) { }
             catch { }
@@ -470,24 +455,49 @@ namespace Movie_AnimeQuizApp.Views {
             }
         }
 
+        private void UpdateCorrectRadioLabels() {
+            if (CorrectRadio1 != null) CorrectRadio1.Content = (CorrectRadio1.IsChecked == true) ? "正解" : "不正解";
+            if (CorrectRadio2 != null) CorrectRadio2.Content = (CorrectRadio2.IsChecked == true) ? "正解" : "不正解";
+            if (CorrectRadio3 != null) CorrectRadio3.Content = (CorrectRadio3.IsChecked == true) ? "正解" : "不正解";
+        }
+
         private void CorrectRadio_Checked(object sender, RoutedEventArgs e) {
             if (CorrectRadio1.IsChecked != true &&
                 CorrectRadio2.IsChecked != true &&
                 CorrectRadio3.IsChecked != true) {
                 CorrectRadio1.IsChecked = true;
             }
+
+            UpdateCorrectRadioLabels();
         }
 
-        // -------------------------
-        // ★保存：DB保存 + 共有ファイル追記
-        // -------------------------
+        // ★入力中に外側ScrollViewerが勝手に動くのを防ぐ（見た目は変えない）
+        private void QuestionTextBox_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e) {
+            if (QuestionTextBox != null && QuestionTextBox.IsKeyboardFocusWithin) {
+                e.Handled = true;
+            }
+        }
+
+        // ★ホイールで外側へ伝播しない（問題文だけスクロール）
+        private void QuestionTextBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e) {
+            if (QuestionTextBox == null) return;
+
+            if (e.Delta > 0) QuestionTextBox.LineUp();
+            else QuestionTextBox.LineDown();
+
+            e.Handled = true;
+        }
+
         private async void Save_Click(object sender, RoutedEventArgs e) {
             await AppDb.InitAsync();
 
             if (_selectedWork == null) { return; }
 
+            // ★作成者未入力は保存できない
             string createdBy = (CreatedByTextBox.Text ?? "").Trim();
-            if (createdBy.Length == 0) createdBy = "anonymous";
+            if (createdBy.Length == 0) {
+                return;
+            }
 
             string question = (QuestionTextBox.Text ?? "").Trim();
             if (question.Length == 0 || question == QuestionPlaceholder) {
@@ -536,7 +546,6 @@ namespace Movie_AnimeQuizApp.Views {
                 await AppDb.Connection.InsertAsync(ch2);
                 await AppDb.Connection.InsertAsync(ch3);
 
-                // ★共有ファイルにも追記（相手に届く）
                 await QuizShare.AppendAsync(
                     _selectedWork,
                     quiz,
@@ -570,28 +579,24 @@ namespace Movie_AnimeQuizApp.Views {
 
             string ov = (work?.Overview ?? "").Trim();
 
-            // 何もないなら「指示文だけ」
             if (ov.Length == 0) {
                 QuestionTextBox.Text = OverviewInstruction + Environment.NewLine;
                 QuestionTextBox.Foreground = Brushes.White;
                 return;
             }
 
-            // ★「翻訳されていません…」系は表示しない
             for (int i = 0; i < OverviewBlockPhrases.Length; i++) {
                 if (ov.Contains(OverviewBlockPhrases[i])) {
-                    // 指示文だけにする（概要は出さない）
                     QuestionTextBox.Text = OverviewInstruction + Environment.NewLine;
                     QuestionTextBox.Foreground = Brushes.White;
                     return;
                 }
             }
 
-            // ★日本語じゃなさそうなら表示しない（ひらがな/カタカナ/漢字が含まれない場合）
             bool hasJa = ov.Any(ch =>
-                (ch >= '\u3040' && ch <= '\u309F') ||   // ひらがな
-                (ch >= '\u30A0' && ch <= '\u30FF') ||   // カタカナ
-                (ch >= '\u4E00' && ch <= '\u9FFF')      // 漢字
+                (ch >= '\u3040' && ch <= '\u309F') ||
+                (ch >= '\u30A0' && ch <= '\u30FF') ||
+                (ch >= '\u4E00' && ch <= '\u9FFF')
             );
 
             if (!hasJa) {
@@ -600,7 +605,6 @@ namespace Movie_AnimeQuizApp.Views {
                 return;
             }
 
-            // ★先頭行に指示文、その下に概要
             QuestionTextBox.Text = OverviewInstruction + Environment.NewLine + ov;
             QuestionTextBox.Foreground = Brushes.White;
         }

@@ -5,12 +5,12 @@
         Title="Trailer"
         WindowStyle="None"
         ResizeMode="NoResize"
-        WindowState="Maximized"
+        WindowState="Normal"
+        WindowStartupLocation="Manual"
         Background="Black"
-        KeyDown="Window_KeyDown" Width="1000" Height="500">
+        KeyDown="Window_KeyDown">
 
     <Grid>
-        
         <wv2:WebView2 x:Name="TrailerWebView"/>
     </Grid>
 </Window>

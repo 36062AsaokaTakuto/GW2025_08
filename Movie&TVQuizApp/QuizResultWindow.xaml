@@ -67,114 +67,122 @@
         <!-- 暗幕 -->
         <Border Background="#B30E0F12"/>
 
-        <Grid Margin="24">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        <!-- ★ここだけ追加：中身を縮小スケールして見切れ防止（背景はそのまま） -->
+        <Viewbox Stretch="Uniform"
+                 StretchDirection="DownOnly"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center">
 
-            <!-- 右上：正答率 -->
-            <Border Grid.Row="0" Background="Transparent"
-                    Style="{StaticResource CardBorderStyle}"
-                    HorizontalAlignment="Right"
-                    Padding="16"
-                    Margin="0,0,0,12">
-                <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="正答率"
-                               Style="{StaticResource SubtleTextStyle}"
-                               HorizontalAlignment="Center" FontSize="60"/>
-                    <TextBlock x:Name="ProgressText"
-                               Text="0 / 0"
-                               FontSize="55"
-                               FontWeight="Bold"
-                               Foreground="#EDEDED"
-                               HorizontalAlignment="Center"
-                               Margin="0,6,0,0"/>
-                </StackPanel>
-            </Border>
-
-            <!-- 中央：上=〇/×（最大化） 下=カード（問題文は全部表示） -->
-            <Grid Grid.Row="1"
-                  VerticalAlignment="Stretch"
-                  HorizontalAlignment="Center">
+            <!-- ★基準サイズ（これを基準に画面が小さい時だけ縮小） -->
+            <Grid Margin="24" Width="1920" Height="1080">
                 <Grid.RowDefinitions>
-                    <!-- 〇/×：残り全部 -->
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <!-- カード：必要分だけ -->
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- 〇/×：Viewboxで“見切れない範囲で最大” -->
-                <!-- ★Paddingを減らして〇をもっと大きく -->
-                <Border Grid.Row="0"
-                        Background="Transparent"
-                        Padding="0,0,0,0">
-                    <!-- ★DownOnlyだと×が拡大できず小さく見える → Bothにする -->
-                    <Viewbox Stretch="Uniform"
-                             StretchDirection="Both"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Center">
-                        <TextBlock x:Name="ResultText"
-                                   Text="〇"
-                                   FontSize="900"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"/>
-                    </Viewbox>
-                </Border>
-
-                <!-- カード（正解文＋問題文） -->
-                <Border Grid.Row="1"
+                <!-- 右上：正答率 -->
+                <Border Grid.Row="0" Background="Transparent"
                         Style="{StaticResource CardBorderStyle}"
-                        Padding="28"
-                        HorizontalAlignment="Center">
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-30,0,0">
-
-                        <!-- 正解は〇〇です。 -->
-                        <TextBlock x:Name="CorrectAnswerText"
-                                   Text="正解は〇〇です。"
-                                   FontSize="42"
+                        HorizontalAlignment="Right"
+                        Padding="16"
+                        Margin="0,0,0,12">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="正答率"
+                                   Style="{StaticResource SubtleTextStyle}"
+                                   HorizontalAlignment="Center" FontSize="60"/>
+                        <TextBlock x:Name="ProgressText"
+                                   Text="0 / 0"
+                                   FontSize="55"
                                    FontWeight="Bold"
-                                   TextAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   TextWrapping="Wrap"
-                                   Margin="0,10,0,18"/>
-
-                        <!-- 問題文：改行基準を広げる（2.5倍相当） -->
-                        <TextBlock x:Name="QuestionText"
-                                   FontSize="30"
                                    Foreground="#EDEDED"
-                                   TextAlignment="Center"
                                    HorizontalAlignment="Center"
-                                   TextWrapping="Wrap"
-                                   MaxWidth="1800"/>
+                                   Margin="0,6,0,0"/>
                     </StackPanel>
                 </Border>
+
+                <!-- 中央：上=〇/×（最大化） 下=カード（問題文は全部表示） -->
+                <Grid Grid.Row="1"
+                      VerticalAlignment="Stretch"
+                      HorizontalAlignment="Center">
+                    <Grid.RowDefinitions>
+                        <!-- 〇/×：残り全部 -->
+                        <RowDefinition Height="*"/>
+                        <!-- カード：必要分だけ -->
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 〇/×：Viewboxで“見切れない範囲で最大” -->
+                    <!-- ★Paddingを減らして〇をもっと大きく -->
+                    <Border Grid.Row="0"
+                            Background="Transparent"
+                            Padding="0,0,0,0">
+                        <!-- ★DownOnlyだと×が拡大できず小さく見える → Bothにする -->
+                        <Viewbox Stretch="Uniform"
+                                 StretchDirection="Both"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center">
+                            <TextBlock x:Name="ResultText"
+                                       Text="〇"
+                                       FontSize="900"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Viewbox>
+                    </Border>
+
+                    <!-- カード（正解文＋問題文） -->
+                    <Border Grid.Row="1"
+                            Style="{StaticResource CardBorderStyle}"
+                            Padding="28"
+                            HorizontalAlignment="Center">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-30,0,0">
+
+                            <!-- 正解は〇〇です。 -->
+                            <TextBlock x:Name="CorrectAnswerText"
+                                       Text="正解は〇〇です。"
+                                       FontSize="42"
+                                       FontWeight="Bold"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Margin="0,10,0,18"/>
+
+                            <!-- 問題文：改行基準を広げる（2.5倍相当） -->
+                            <TextBlock x:Name="QuestionText"
+                                       FontSize="30"
+                                       Foreground="#EDEDED"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       MaxWidth="1800"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- 下：ボタン -->
+                <Grid Grid.Row="2" Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="NextBtn"
+                            Grid.Column="0"
+                            Content="次の問題へ"
+                            Height="64"
+                            Style="{StaticResource FlatButtonStyle}"
+                            Click="NextBtn_Click"/>
+
+                    <Button x:Name="CloseBtn"
+                            Grid.Column="2"
+                            Content="閉じる"
+                            Height="64"
+                            Style="{StaticResource FlatButtonStyle}"
+                            Click="CloseBtn_Click"/>
+                </Grid>
             </Grid>
-
-            <!-- 下：ボタン -->
-            <Grid Grid.Row="2" Margin="0,16,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="16"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Button x:Name="NextBtn"
-                        Grid.Column="0"
-                        Content="次の問題へ"
-                        Height="64"
-                        Style="{StaticResource FlatButtonStyle}"
-                        Click="NextBtn_Click"/>
-
-                <Button x:Name="CloseBtn"
-                        Grid.Column="2"
-                        Content="閉じる"
-                        Height="64"
-                        Style="{StaticResource FlatButtonStyle}"
-                        Click="CloseBtn_Click"/>
-            </Grid>
-        </Grid>
+        </Viewbox>
     </Grid>
 </Window>

@@ -43,6 +43,64 @@ namespace Movie_AnimeQuizApp.Views {
 
         private const string InstructionLine = "〇になっている単語を選択肢から選べ。";
 
+        // =====================================================
+        // ★追加：QuizPlayで「最初に1回だけ」シャッフルした順番を保持
+        // （同じ作品の問題が複数あるとき、出題順をランダム固定にする）
+        // =====================================================
+        private static readonly object _orderLock = new object();
+        private static string _orderWorkKey = "";
+        private static List<int> _orderQuizIds = new List<int>();
+        private static int _orderPos = 0;
+        private static readonly Random _rng = new Random();
+
+        private static void ShuffleInPlace(List<int> list) {
+            if (list == null || list.Count <= 1) return;
+            for (int i = list.Count - 1; i > 0; i--) {
+                int j = _rng.Next(i + 1);
+                int tmp = list[i];
+                list[i] = list[j];
+                list[j] = tmp;
+            }
+        }
+
+        // forceReset=true の時だけ「最初に1回シャッフル」をやり直す（新セッション開始時）
+        private void InitOrKeepShuffledOrder(List<Data.Entities.Quiz> quizzes, bool forceReset, int removeQuizId) {
+            lock (_orderLock) {
+                bool needReset =
+                    forceReset ||
+                    !string.Equals(_orderWorkKey, _workKey ?? "", StringComparison.Ordinal) ||
+                    _orderQuizIds == null || _orderQuizIds.Count == 0;
+
+                if (needReset) {
+                    _orderWorkKey = _workKey ?? "";
+                    _orderQuizIds = (quizzes ?? new List<Data.Entities.Quiz>())
+                        .Where(q => q != null && q.QuizId > 0)
+                        .Select(q => q.QuizId)
+                        .Distinct()
+                        .ToList();
+
+                    ShuffleInPlace(_orderQuizIds);
+                    _orderPos = 0;
+                }
+
+                // startQuizId 指定で開始する場合、そのIDが後で重複出題されないように除外
+                if (removeQuizId > 0 && _orderQuizIds != null && _orderQuizIds.Count > 0) {
+                    _orderQuizIds.Remove(removeQuizId);
+                }
+            }
+        }
+
+        private int PickNextQuizIdFromShuffledOrder() {
+            lock (_orderLock) {
+                if (_orderQuizIds == null || _orderQuizIds.Count == 0) return 0;
+                if (_orderPos >= _orderQuizIds.Count) return 0;
+
+                int id = _orderQuizIds[_orderPos];
+                _orderPos++;
+                return id;
+            }
+        }
+
         public QuizPlayWindow(QuizSession session) {
             InitializeComponent();
 
@@ -125,13 +183,20 @@ namespace Movie_AnimeQuizApp.Views {
             }
 
             // ここは “次の問題” で継続するために残す（外側の画面から開始する時に StartNew する）
+            bool startedNewSession = false;
             if (QuizSession.Current == null || !QuizSession.Current.IsSameWork(_workKey)) {
                 QuizSession.StartNew(_workKey, _allQuizzes.Count);
+                startedNewSession = true;
             }
 
+            // ★ここが本題：最初に1回だけシャッフル（新セッション開始時のみ）
+            InitOrKeepShuffledOrder(_allQuizzes, startedNewSession, _startQuizId);
+
             int quizIdToPlay = _startQuizId;
+
+            // startQuizId が無ければ、シャッフル済み順で次を取る
             if (quizIdToPlay <= 0) {
-                quizIdToPlay = QuizSession.Current.PickNextQuizIdAndMark(_allQuizzes);
+                quizIdToPlay = PickNextQuizIdFromShuffledOrder();
             }
 
             if (quizIdToPlay <= 0) {
