@@ -83,12 +83,12 @@
     <Grid>
         <Image x:Name="BackdropImage" Stretch="UniformToFill" Opacity="0.95"/>
 
-        <!-- ★ここが重要：横スクロールを「Hidden」→「Disabled」にして、内容が横に伸びないようにする -->
-        <ScrollViewer VerticalScrollBarVisibility="Hidden"
+        <!-- ★全体はスクロールさせない（問題文だけスクロール） -->
+        <ScrollViewer VerticalScrollBarVisibility="Disabled"
                       HorizontalScrollBarVisibility="Disabled"
                       Background="Transparent"
                       BorderThickness="0"
-                      PanningMode="VerticalOnly">
+                      PanningMode="None">
 
             <Border Background="#220E0F12"
                     Padding="8"
@@ -109,16 +109,16 @@
                         <RowDefinition Height="1.25*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- 上：作品名 -->
+                    <!-- 上：作品名（150%でも収まるように） -->
                     <TextBlock Grid.Column="1" Grid.Row="0"
                                x:Name="WorkTitleText"
                                Style="{StaticResource TitleTextStyle}"
                                Text="未選択"
-                               FontSize="70"
+                               FontSize="44"
                                TextWrapping="Wrap"
                                TextAlignment="Center"
                                HorizontalAlignment="Center"
-                               Margin="0,50,8,4"/>
+                               Margin="0,10,8,4"/>
 
                     <!-- 右上：作品検索 -->
                     <StackPanel Grid.Column="2" Grid.Row="0" Margin="0,20,0,4">
@@ -184,16 +184,21 @@
                         </Popup>
                     </StackPanel>
 
-                    <!-- 中：問題文 -->
-                    <StackPanel Grid.Column="1" Grid.Row="1" Margin="0,0,8,0">
-                        <TextBlock Text="問題文"
+                    <!-- 中：問題文（全体は収める / 溢れたらここだけスクロール / スクロールバーなし） -->
+                    <Grid Grid.Column="1" Grid.Row="1" Margin="0,0,8,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="問題文"
                                    Style="{StaticResource LabelTextStyle}"
                                    HorizontalAlignment="Center"
-                                   FontSize="52"
-                                   Margin="0,100,0,10"/>
+                                   FontSize="34"
+                                   Margin="0,20,0,10"/>
 
-                        <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0,80,0,0">
-                            <!-- ★重要：WrapWithOverflow + 横スクロール無効で、連続文字でも必ず折り返す -->
+                        <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,0,0,0">
                             <TextBox x:Name="QuestionTextBox"
                                      Style="{StaticResource DarkTextBoxStyle}"
                                      AcceptsReturn="True"
@@ -201,17 +206,16 @@
                                      Text="問題文を入力してください。"
                                      Foreground="Gray"
                                      FontSize="25"
-                                     Height="380"
                                      MinHeight="240"
                                      GotFocus="Question_GotFocus"
                                      LostFocus="Question_LostFocus"
-                                     VerticalScrollBarVisibility="Auto"
+                                     VerticalScrollBarVisibility="Hidden"
                                      HorizontalScrollBarVisibility="Disabled"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                      RequestBringIntoView="QuestionTextBox_RequestBringIntoView"
                                      PreviewMouseWheel="QuestionTextBox_PreviewMouseWheel"/>
                         </Border>
-                    </StackPanel>
+                    </Grid>
 
                     <!-- 右：設定 -->
                     <StackPanel Grid.Column="2" Grid.Row="1">
@@ -370,12 +374,12 @@
                         </UniformGrid>
                     </Border>
 
-                    <!-- 右下：保存/キャンセル -->
+                    <!-- 右下：保存/キャンセル（150%でも収まるように） -->
                     <StackPanel Grid.Column="2" Grid.Row="2">
-                        <Button Content="保存" Height="70" Style="{StaticResource FlatButtonStyle}"
-                                Background="#E50914" Margin="0,10,0,0" Click="Save_Click"/>
-                        <Button Content="閉じる" Height="70" Style="{StaticResource FlatButtonStyle}"
-                                Margin="0,40,0,0" Click="Cancel_Click"/>
+                        <Button Content="保存" Height="60" Style="{StaticResource FlatButtonStyle}"
+                                Background="#E50914" Margin="0,8,0,0" Click="Save_Click"/>
+                        <Button Content="閉じる" Height="60" Style="{StaticResource FlatButtonStyle}"
+                                Margin="0,12,0,0" Click="Cancel_Click"/>
                     </StackPanel>
 
                 </Grid>
