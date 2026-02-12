@@ -1,5 +1,5 @@
 ﻿// MediaBrowser.xaml.cs
-// ※「クイズしたい作品名を入力」が空欄のとき、1回クリックだけで候補が出るように（MainWindowと同じ流れ）
+// ※MainWindowでこのチャット内に指示された変更（プレースホルダーTextBlockクリックで1回で候補、空欄1クリックで候補、外クリック判定、候補Popup、など）を同じ挙動で反映
 // ※「人気/上映中/放送中」押下時は必ず一覧を最上部へ
 // ※それ以外は変更しない
 
@@ -15,7 +15,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -238,7 +237,7 @@ namespace Movie_AnimeQuizApp {
         }
 
         // =========================================================
-        // 外クリック：クイズ検索のフォーカス制御
+        // 外クリック：クイズ検索のフォーカス制御（MainWindowと同じ判定）
         // =========================================================
         private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e) {
             DependencyObject src = e.OriginalSource as DependencyObject;
@@ -391,7 +390,7 @@ namespace Movie_AnimeQuizApp {
         }
 
         // =========================================================
-        // ★追加：入力欄BorderのPadding部分クリックでも「1回で」候補を出す
+        // ★MainWindowと同じ：入力欄Borderクリックで「1回で」候補を出す
         // =========================================================
         private void QuizSearchBoxBorder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) {
             if (QuizSearchTextBox == null) return;
@@ -415,6 +414,33 @@ namespace Movie_AnimeQuizApp {
             Dispatcher.BeginInvoke(new Action(() => {
                 ShowQuizSuggestAllIfEmptyAndFocused();
             }), DispatcherPriority.Input);
+        }
+
+        // =========================================================
+        // ★MainWindowと同じ：プレースホルダー(TextBlock)クリック時の処理
+        // =========================================================
+        private void QuizSearchPlaceholder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) {
+            if (QuizSearchBoxBorder != null) {
+                QuizSearchBoxBorder_PreviewMouseLeftButtonDown(QuizSearchBoxBorder, e);
+            } else {
+                if (QuizSearchTextBox == null) return;
+
+                CancelMenuHide();
+                if (QuizMenu != null) QuizMenu.Visibility = Visibility.Visible;
+                if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Visible;
+
+                if (!QuizSearchTextBox.IsKeyboardFocusWithin) {
+                    QuizSearchTextBox.Focus();
+                }
+
+                QuizSearchTextBox.IsReadOnlyCaretVisible = true;
+
+                Dispatcher.BeginInvoke(new Action(() => {
+                    ShowQuizSuggestAllIfEmptyAndFocused();
+                }), DispatcherPriority.Input);
+            }
+
+            e.Handled = true;
         }
 
         // =========================================================

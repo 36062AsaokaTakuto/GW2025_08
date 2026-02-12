@@ -372,13 +372,14 @@
                                      PreviewMouseLeftButtonDown="QuizSearch_PreviewMouseLeftButtonDown"
                                      TextChanged="QuizSearch_TextChanged"/>
 
-                            <!-- プレースホルダー -->
+                            <!-- プレースホルダー（MainWindowと同じ：TextBlockクリックも拾って1回で候補表示） -->
                             <TextBlock Text="クイズしたい作品名を入力"
                                        Foreground="Gray"
                                        FontSize="16"
                                        Margin="2,0,0,0"
                                        VerticalAlignment="Center"
-                                       IsHitTestVisible="False">
+                                       IsHitTestVisible="True"
+                                       PreviewMouseLeftButtonDown="QuizSearchPlaceholder_PreviewMouseLeftButtonDown">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed"/>

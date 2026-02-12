@@ -1,4 +1,8 @@
 ﻿// MainWindow.xaml.cs（ひらがな/カタカナ + 半角/全角 + 英字大小 対応 & クイズ候補を高速化）
+// ★要望対応：作品候補（クイズ候補）の表示を速くする（他は変更しない）
+//  - 空欄候補（全件）を毎回作り直さない：一度だけ生成してキャッシュ
+//  - 文字入力候補の反応を速く：デバウンスを短縮
+//  - スクロール位置合わせを軽量化：ScrollIntoView/UpdateLayout連発を減らし、インデックス基準でスクロール
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -36,6 +40,16 @@ namespace Movie_AnimeQuizApp {
 
         // ★候補クリックでTextを入れる時、TextChangedから候補再検索を発火させない
         private bool _suppressQuizSuggest = false;
+
+        // ★空欄候補で「最後にクリックした作品」から表示開始するために記憶
+        private string _lastQuizSuggestWorkKey = "";
+
+        // ★今表示しているクイズ候補が「空欄（全件）」モードかどうか
+        //   → これが true の時だけ _lastQuizSuggestWorkKey を更新する
+        private volatile bool _quizSuggestIsEmptyMode = false;
+
+        // ★スクロール高速化：推定行高（ピクセルスクロール時のフォールバック）
+        private const double QuizSuggestEstimatedRowHeight = 86.0;
 
         // ===== ★かな/幅/大小を無視して比較（ひらがな⇔カタカナ対応）=====
         private static readonly CompareInfo _jaComp =
@@ -132,6 +146,10 @@ namespace Movie_AnimeQuizApp {
         private volatile bool _quizIndexLoaded = false;
         private List<QuizSuggestRow> _quizIndex = new List<QuizSuggestRow>();
 
+        // ★追加：空欄候補（全件）用の変換済みキャッシュ（毎回 Select/OrderBy しない）
+        private volatile bool _quizAllCacheBuilt = false;
+        private List<QuizSuggestItem> _quizAllCache = new List<QuizSuggestItem>();
+
         // ===== メニュー非表示タイマー =====
         private readonly DispatcherTimer _menuHideTimer;
 
@@ -197,7 +215,8 @@ namespace Movie_AnimeQuizApp {
                 await RunSuggestAsync(q);
             };
 
-            _quizSuggestDebounceTimer.Interval = TimeSpan.FromMilliseconds(260);
+            // ★速くする：デバウンス短縮（候補表示の体感を上げる）
+            _quizSuggestDebounceTimer.Interval = TimeSpan.FromMilliseconds(120);
             _quizSuggestDebounceTimer.Tick += async (_, __) => {
                 _quizSuggestDebounceTimer.Stop();
                 string q = _pendingQuizSuggestQuery;
@@ -610,12 +629,19 @@ namespace Movie_AnimeQuizApp {
             if (QuizMenu != null) QuizMenu.Visibility = Visibility.Visible;
             if (QuizSearchPanel != null) QuizSearchPanel.Visibility = Visibility.Visible;
 
+            // ★初回クリックで確実に候補を出す
             if (!QuizSearchTextBox.IsKeyboardFocusWithin) {
                 e.Handled = true;
                 QuizSearchTextBox.Focus();
+
+                Dispatcher.BeginInvoke(new Action(() => {
+                    ShowQuizSuggestAllIfEmptyAndFocused();
+                }), DispatcherPriority.Input);
+
+                return;
             }
 
-            // ★空欄クリック時だけ候補一覧を出す
+            // ★空欄クリック時だけ候補一覧を出す（すでにフォーカスがある場合）
             ShowQuizSuggestAllIfEmptyAndFocused();
         }
 
@@ -663,6 +689,7 @@ namespace Movie_AnimeQuizApp {
             string q = (QuizSearchTextBox.Text ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(q)) {
+                // ★空欄に戻った時も空欄候補
                 if (QuizSearchTextBox.IsKeyboardFocusWithin) {
                     ShowQuizSuggestAllIfEmptyAndFocused();
                 } else {
@@ -698,6 +725,9 @@ namespace Movie_AnimeQuizApp {
             var si = QuizSuggestList.SelectedItem as QuizSuggestItem;
             if (si == null) return;
 
+            // ★空欄（全件）モードの時だけ記憶（背景色は変えない＝選択しない）
+            if (_quizSuggestIsEmptyMode) _lastQuizSuggestWorkKey = si.WorkKey ?? "";
+
             if (QuizSearchTextBox != null) {
                 _suppressQuizSuggest = true;
                 QuizSearchTextBox.Text = si.Title ?? "";
@@ -717,6 +747,9 @@ namespace Movie_AnimeQuizApp {
             if (e.Key == Key.Enter) {
                 var si = (QuizSuggestList != null) ? (QuizSuggestList.SelectedItem as QuizSuggestItem) : null;
                 if (si == null) return;
+
+                // ★空欄（全件）モードの時だけ記憶
+                if (_quizSuggestIsEmptyMode) _lastQuizSuggestWorkKey = si.WorkKey ?? "";
 
                 if (QuizSearchTextBox != null) {
                     _suppressQuizSuggest = true;
@@ -742,7 +775,7 @@ namespace Movie_AnimeQuizApp {
             _ = RunQuizSuggestEmptyAsync();
         }
 
-        // ★修正：登録済みを「全部」入れる（Take(12)なし）
+        // ★空欄候補：高速化（毎回作らない／キャッシュを使う）
         private async Task RunQuizSuggestEmptyAsync() {
             long mySeq = Interlocked.Increment(ref _quizSuggestSeq);
 
@@ -758,23 +791,8 @@ namespace Movie_AnimeQuizApp {
                 if (token.IsCancellationRequested) return;
                 if (mySeq != _quizSuggestSeq) return;
 
-                var src = _quizIndex;
-
-                var list = await Task.Run(() => {
-                    return src
-                        .Where(r => r != null && !string.IsNullOrWhiteSpace(r.Title))
-                        .OrderBy(r => r.Title, StringComparer.CurrentCulture)
-                        .Select(r => new QuizSuggestItem {
-                            WorkKey = r.WorkKey ?? "",
-                            Title = r.Title ?? "",
-                            PosterThumbUrl = BuildPosterThumbUrlFromStored(r.PosterPath),
-                            Sub = "クイズ数: " + r.QuizCount.ToString()
-                        })
-                        .ToList();
-                }, token);
-
-                if (token.IsCancellationRequested) return;
-                if (mySeq != _quizSuggestSeq) return;
+                // ★変換済みキャッシュを使う
+                var list = _quizAllCache ?? new List<QuizSuggestItem>();
 
                 await Dispatcher.InvokeAsync(() => {
                     if (mySeq != _quizSuggestSeq) return;
@@ -786,13 +804,158 @@ namespace Movie_AnimeQuizApp {
                     QuizSuggestions.Clear();
                     for (int i = 0; i < list.Count; i++) QuizSuggestions.Add(list[i]);
 
-                    if (QuizSuggestions.Count > 0) ShowQuizSuggest();
-                    else HideQuizSuggest();
-                });
+                    if (QuizSuggestions.Count > 0) {
+                        _quizSuggestIsEmptyMode = true; // ★空欄（全件）モード
+                        EnsureQuizSuggestEmptyStartFromLastClicked_NoFlicker();
+                    } else {
+                        _quizSuggestIsEmptyMode = false;
+                        HideQuizSuggest();
+                    }
+                }, DispatcherPriority.Background);
             }
             catch {
                 await Dispatcher.InvokeAsync(() => HideQuizSuggest());
             }
+        }
+
+        // =========================
+        // ★空欄候補：最後にクリックした作品から表示（高速スクロール）
+        // =========================
+        private void EnsureQuizSuggestEmptyStartFromLastClicked_NoFlicker() {
+            try {
+                if (QuizSuggestPopup == null) return;
+
+                if (QuizSearchTextBox != null) {
+                    QuizSuggestPopup.PlacementTarget = QuizSearchTextBox;
+                    QuizSuggestPopup.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                    QuizSuggestPopup.HorizontalOffset = -10;
+                    QuizSuggestPopup.VerticalOffset = 6;
+                }
+
+                // 見えない状態で開いてスクロールだけ確定 → チラつきを抑えつつ高速化
+                SetQuizSuggestPopupOpacity(0);
+                if (!QuizSuggestPopup.IsOpen) QuizSuggestPopup.IsOpen = true;
+
+                int startIndex = 0;
+
+                if (!string.IsNullOrWhiteSpace(_lastQuizSuggestWorkKey) && QuizSuggestions != null && QuizSuggestions.Count > 0) {
+                    for (int i = 0; i < QuizSuggestions.Count; i++) {
+                        var it = QuizSuggestions[i];
+                        if (it != null && (it.WorkKey ?? "") == _lastQuizSuggestWorkKey) {
+                            startIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                ScrollQuizSuggestToIndexTopFast(startIndex);
+
+                if (QuizSuggestList != null) QuizSuggestList.SelectedIndex = -1; // 背景色を変えない
+
+                Dispatcher.BeginInvoke(new Action(() => {
+                    SetQuizSuggestPopupOpacity(1);
+                }), DispatcherPriority.Render);
+            }
+            catch {
+                SetQuizSuggestPopupOpacity(1);
+            }
+        }
+
+        // =========================
+        // ★要望維持：文字入力（検索）モードは必ず「候補の1つ目」から表示（高速）
+        // =========================
+        private void EnsureQuizSuggestTypedAlwaysTop_NoFlicker() {
+            try {
+                if (QuizSuggestPopup == null) return;
+
+                if (QuizSearchTextBox != null) {
+                    QuizSuggestPopup.PlacementTarget = QuizSearchTextBox;
+                    QuizSuggestPopup.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                    QuizSuggestPopup.HorizontalOffset = -10;
+                    QuizSuggestPopup.VerticalOffset = 6;
+                }
+
+                SetQuizSuggestPopupOpacity(0);
+                if (!QuizSuggestPopup.IsOpen) QuizSuggestPopup.IsOpen = true;
+
+                ScrollQuizSuggestToIndexTopFast(0);
+
+                if (QuizSuggestList != null) QuizSuggestList.SelectedIndex = -1;
+
+                Dispatcher.BeginInvoke(new Action(() => {
+                    SetQuizSuggestPopupOpacity(1);
+                }), DispatcherPriority.Render);
+            }
+            catch {
+            }
+        }
+
+        // ★高速：インデックス基準で「その行が先頭になる」ようにスクロール
+        private void ScrollQuizSuggestToIndexTopFast(int index) {
+            if (index < 0) index = 0;
+
+            if (QuizSuggestList == null) return;
+
+            try {
+                QuizSuggestList.SelectedIndex = -1;
+
+                // テンプレート/レイアウトを最低限だけ確定
+                QuizSuggestList.ApplyTemplate();
+                QuizSuggestList.UpdateLayout();
+
+                var sv = FindVisualChild<ScrollViewer>(QuizSuggestList);
+                if (sv == null) return;
+
+                int count = (QuizSuggestions != null) ? QuizSuggestions.Count : 0;
+                if (count <= 0) {
+                    sv.ScrollToVerticalOffset(0);
+                    return;
+                }
+                if (index >= count) index = count - 1;
+
+                // item単位スクロールか pixel かを軽く判定して最適化
+                // pixel の時は ScrollableHeight がかなり大きくなりがち
+                bool pixelBased = (sv.ScrollableHeight > (count * 2.0));
+
+                if (!pixelBased) {
+                    // item単位（高速）
+                    sv.ScrollToVerticalOffset(index);
+                } else {
+                    // pixel単位（フォールバック）
+                    sv.ScrollToVerticalOffset(index * QuizSuggestEstimatedRowHeight);
+                }
+
+                // もう一度だけ（Virtualizing対策）
+                QuizSuggestList.UpdateLayout();
+                if (!pixelBased) sv.ScrollToVerticalOffset(index);
+                else sv.ScrollToVerticalOffset(index * QuizSuggestEstimatedRowHeight);
+
+                QuizSuggestList.SelectedIndex = -1;
+            }
+            catch {
+            }
+        }
+
+        private void SetQuizSuggestPopupOpacity(double value) {
+            try {
+                var fe = (QuizSuggestPopup != null) ? (QuizSuggestPopup.Child as FrameworkElement) : null;
+                if (fe != null) fe.Opacity = value;
+            }
+            catch { }
+        }
+
+        private static T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject {
+            if (parent == null) return null;
+
+            int count = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++) {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T) return (T)child;
+
+                var found = FindVisualChild<T>(child);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         // =========================
@@ -818,10 +981,43 @@ namespace Movie_AnimeQuizApp {
 
                 _quizIndex = rows ?? new List<QuizSuggestRow>();
                 _quizIndexLoaded = true;
+
+                // ★空欄候補用キャッシュも一度だけ構築（表示を速くする）
+                var built = new List<QuizSuggestItem>();
+                try {
+                    var src = _quizIndex;
+                    built.Capacity = src != null ? src.Count : 0;
+
+                    for (int i = 0; i < src.Count; i++) {
+                        var r = src[i];
+                        if (r == null) continue;
+
+                        string title = r.Title ?? "";
+                        if (string.IsNullOrWhiteSpace(title)) continue;
+
+                        built.Add(new QuizSuggestItem {
+                            WorkKey = r.WorkKey ?? "",
+                            Title = title,
+                            PosterThumbUrl = BuildPosterThumbUrlFromStored(r.PosterPath),
+                            Sub = "クイズ数: " + r.QuizCount.ToString()
+                        });
+                    }
+
+                    built.Sort((a, b) => StringComparer.CurrentCulture.Compare(a.Title, b.Title));
+                }
+                catch {
+                    built = new List<QuizSuggestItem>();
+                }
+
+                _quizAllCache = built;
+                _quizAllCacheBuilt = true;
             }
             catch {
                 _quizIndex = new List<QuizSuggestRow>();
                 _quizIndexLoaded = true;
+
+                _quizAllCache = new List<QuizSuggestItem>();
+                _quizAllCacheBuilt = true;
             }
             finally {
                 _quizIndexGate.Release();
@@ -832,6 +1028,9 @@ namespace Movie_AnimeQuizApp {
         private void InvalidateQuizIndex() {
             _quizIndexLoaded = false;
             _quizIndex.Clear();
+
+            _quizAllCacheBuilt = false;
+            _quizAllCache.Clear();
         }
 
         // =========================
@@ -892,9 +1091,14 @@ namespace Movie_AnimeQuizApp {
                     QuizSuggestions.Clear();
                     for (int i = 0; i < list.Count; i++) QuizSuggestions.Add(list[i]);
 
-                    if (QuizSuggestions.Count > 0) ShowQuizSuggest();
-                    else HideQuizSuggest();
-                });
+                    if (QuizSuggestions.Count > 0) {
+                        _quizSuggestIsEmptyMode = false; // ★文字入力（検索）モード
+                        EnsureQuizSuggestTypedAlwaysTop_NoFlicker();
+                    } else {
+                        _quizSuggestIsEmptyMode = false;
+                        HideQuizSuggest();
+                    }
+                }, DispatcherPriority.Background);
             }
             catch {
                 await Dispatcher.InvokeAsync(() => HideQuizSuggest());
@@ -911,6 +1115,7 @@ namespace Movie_AnimeQuizApp {
                 QuizSuggestPopup.VerticalOffset = 6;
             }
 
+            SetQuizSuggestPopupOpacity(1);
             QuizSuggestPopup.IsOpen = true;
         }
 
@@ -918,6 +1123,9 @@ namespace Movie_AnimeQuizApp {
             try { _quizSuggestDebounceTimer.Stop(); } catch { }
             _pendingQuizSuggestQuery = "";
 
+            _quizSuggestIsEmptyMode = false;
+
+            SetQuizSuggestPopupOpacity(1);
             if (QuizSuggestPopup != null) QuizSuggestPopup.IsOpen = false;
             if (QuizSuggestList != null) QuizSuggestList.SelectedIndex = -1;
             QuizSuggestions.Clear();
