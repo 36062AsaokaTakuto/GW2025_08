@@ -132,6 +132,14 @@ namespace Movie_AnimeQuizApp.Views {
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e) {
+
+            // ★追加：150%表示でも作業領域(タスクバー除く)にぴったり全画面化（全体スクロール不要にするため）
+            var wa = SystemParameters.WorkArea;
+            Left = wa.Left;
+            Top = wa.Top;
+            Width = wa.Width;
+            Height = wa.Height;
+
             try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
 
             try {
