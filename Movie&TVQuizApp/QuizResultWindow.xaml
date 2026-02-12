@@ -171,13 +171,15 @@
                     <Button x:Name="NextBtn"
                             Grid.Column="0"
                             Content="次の問題へ"
+                            FontSize="35"
                             Height="64"
                             Style="{StaticResource FlatButtonStyle}"
                             Click="NextBtn_Click"/>
 
                     <Button x:Name="CloseBtn"
                             Grid.Column="2"
-                            Content="閉じる"
+                            Content="終了する"
+                            FontSize="35"
                             Height="64"
                             Style="{StaticResource FlatButtonStyle}"
                             Click="CloseBtn_Click"/>

@@ -279,7 +279,7 @@
                                         Margin="0,0,0,0">
                                     <Border Style="{StaticResource SmallFieldBorderStyle}">
                                         <Button x:Name="CloseBtn"
-                                                Content="閉じる"
+                                                Content="終了する"
                                                 Click="CloseBtn_Click"
                                                 Background="Transparent"
                                                 Style="{StaticResource CloseFlatButtonStyle}"

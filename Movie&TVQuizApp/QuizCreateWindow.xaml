@@ -84,306 +84,300 @@
         <Image x:Name="BackdropImage" Stretch="UniformToFill" Opacity="0.95"/>
 
         <!-- ★全体はスクロールさせない（問題文だけスクロール） -->
-        <ScrollViewer VerticalScrollBarVisibility="Disabled"
-                      HorizontalScrollBarVisibility="Disabled"
-                      Background="Transparent"
-                      BorderThickness="0"
-                      PanningMode="None">
+        <Border Background="#220E0F12"
+                Padding="8"
+                CornerRadius="22"
+                Margin="16"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
 
-            <Border Background="#220E0F12"
-                    Padding="8"
-                    CornerRadius="22"
-                    Margin="16"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="50"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="300"/>
+                </Grid.ColumnDefinitions>
 
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="50"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="300"/>
-                    </Grid.ColumnDefinitions>
+                <!-- ★修正：上/中/下を Auto / * / Auto にして、100%でも150%でも下段が伸び縮みしない -->
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- 上：作品名（150%でも収まるように） -->
+                <TextBlock Grid.Column="1" Grid.Row="0"
+                           x:Name="WorkTitleText"
+                           Style="{StaticResource TitleTextStyle}"
+                           Text="未選択"
+                           FontSize="44"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           Margin="0,10,8,4"/>
+
+                <!-- 右上：作品検索 -->
+                <StackPanel Grid.Column="2" Grid.Row="0" Margin="0,20,0,4">
+                    <TextBlock Text="作品検索"
+                               Style="{StaticResource LabelTextStyle}"
+                               FontSize="20"
+                               HorizontalAlignment="Center"/>
+
+                    <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0,10,0,10">
+                        <TextBox x:Name="WorkSearchTextBox"
+                                 Style="{StaticResource DarkTextBoxStyle}"
+                                 Foreground="Gray"
+                                 Text="クイズを作りたい作品名を入力"
+                                 FontSize="23"
+                                 MinHeight="52"
+                                 GotFocus="WorkSearch_GotFocus"
+                                 LostFocus="WorkSearch_LostFocus"
+                                 PreviewKeyDown="WorkSearchTextBox_PreviewKeyDown" Height="0"/>
+                    </Border>
+
+                    <Popup x:Name="WorkSuggestPopup"
+                           PlacementTarget="{Binding ElementName=WorkSearchTextBox}"
+                           Placement="Bottom"
+                           StaysOpen="False"
+                           AllowsTransparency="True">
+                        <Border Background="#DD111111"
+                                CornerRadius="10"
+                                BorderBrush="#2A2A2A"
+                                BorderThickness="1"
+                                Width="420"
+                                Margin="0,6,0,0">
+                            <ListBox x:Name="WorkSuggestList"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="White"
+                                     SelectionMode="Single"
+                                     ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     MouseLeftButtonUp="WorkSuggestList_MouseLeftButtonUp"
+                                     PreviewKeyDown="WorkSuggestList_PreviewKeyDown">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="10,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="50"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Width="46" Height="68" CornerRadius="6" ClipToBounds="True" Background="#222">
+                                                <Image Stretch="UniformToFill" Source="{Binding PosterThumbUrl}"/>
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                                <TextBlock Text="{Binding Title}" FontSize="14" Foreground="White" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Sub}" FontSize="12" Foreground="#BFBFBF" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+                    </Popup>
+                </StackPanel>
+
+                <!-- 中：問題文（溢れたらここだけスクロール / スクロールバーなし） -->
+                <Grid Grid.Column="1" Grid.Row="1" Margin="0,0,8,0">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="3.5*"/>
-                        <RowDefinition Height="1.25*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- 上：作品名（150%でも収まるように） -->
-                    <TextBlock Grid.Column="1" Grid.Row="0"
-                               x:Name="WorkTitleText"
-                               Style="{StaticResource TitleTextStyle}"
-                               Text="未選択"
-                               FontSize="44"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"
+                    <TextBlock Grid.Row="0"
+                               Text="問題文"
+                               Style="{StaticResource LabelTextStyle}"
                                HorizontalAlignment="Center"
-                               Margin="0,10,8,4"/>
+                               FontSize="34"
+                               Margin="0,20,0,10"/>
 
-                    <!-- 右上：作品検索 -->
-                    <StackPanel Grid.Column="2" Grid.Row="0" Margin="0,20,0,4">
-                        <TextBlock Text="作品検索"
-                                   Style="{StaticResource LabelTextStyle}"
-                                   FontSize="20"
-                                   HorizontalAlignment="Center"/>
+                    <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,0,0,30">
+                        <TextBox x:Name="QuestionTextBox"
+                                 Style="{StaticResource DarkTextBoxStyle}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="WrapWithOverflow"
+                                 Text="問題文を入力してください。"
+                                 Foreground="Gray"
+                                 FontSize="25"
+                                 MinHeight="240"
+                                 GotFocus="Question_GotFocus"
+                                 LostFocus="Question_LostFocus"
+                                 VerticalScrollBarVisibility="Hidden"
+                                 HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 RequestBringIntoView="QuestionTextBox_RequestBringIntoView"
+                                 PreviewMouseWheel="QuestionTextBox_PreviewMouseWheel"/>
+                    </Border>
+                </Grid>
 
-                        <Border Style="{StaticResource SmallFieldBorderStyle}" Margin="0,10,0,10">
-                            <TextBox x:Name="WorkSearchTextBox"
+                <!-- 右：設定 -->
+                <StackPanel Grid.Column="2" Grid.Row="1">
+                    <TextBlock Text="作成者"
+                               Style="{StaticResource LabelTextStyle}"
+                               Margin="0,20,0,10"
+                               FontSize="20"
+                               HorizontalAlignment="Center"/>
+
+                    <Border Style="{StaticResource SmallFieldBorderStyle}">
+                        <Grid>
+                            <TextBox x:Name="CreatedByTextBox"
                                      Style="{StaticResource DarkTextBoxStyle}"
-                                     Foreground="Gray"
-                                     Text="クイズを作りたい作品名を入力"
-                                     FontSize="23"
-                                     MinHeight="52"
-                                     GotFocus="WorkSearch_GotFocus"
-                                     LostFocus="WorkSearch_LostFocus"
-                                     PreviewKeyDown="WorkSearchTextBox_PreviewKeyDown" Height="0"/>
-                        </Border>
+                                     FontSize="20"
+                                     MinHeight="52"/>
 
-                        <Popup x:Name="WorkSuggestPopup"
-                               PlacementTarget="{Binding ElementName=WorkSearchTextBox}"
-                               Placement="Bottom"
-                               StaysOpen="False"
-                               AllowsTransparency="True">
-                            <Border Background="#DD111111"
-                                    CornerRadius="10"
-                                    BorderBrush="#2A2A2A"
-                                    BorderThickness="1"
-                                    Width="420"
-                                    Margin="0,6,0,0">
-                                <ListBox x:Name="WorkSuggestList"
-                                         Background="Transparent"
-                                         BorderThickness="0"
-                                         Foreground="White"
-                                         SelectionMode="Single"
-                                         ScrollViewer.VerticalScrollBarVisibility="Hidden"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                         MouseLeftButtonUp="WorkSuggestList_MouseLeftButtonUp"
-                                         PreviewKeyDown="WorkSuggestList_PreviewKeyDown">
+                            <TextBlock Text="作成者の名前を入力してください"
+                                       Foreground="Gray"
+                                       FontSize="22"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       TextWrapping="Wrap">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ElementName=CreatedByTextBox, Path=Text}" Value="">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
 
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="10,6">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="50"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="HintText" Visibility="Collapsed"/>
+                </StackPanel>
 
-                                                <Border Width="46" Height="68" CornerRadius="6" ClipToBounds="True" Background="#222">
-                                                    <Image Stretch="UniformToFill" Source="{Binding PosterThumbUrl}"/>
-                                                </Border>
+                <!-- 下：選択肢 -->
+                <Border Grid.Column="1" Grid.Row="2" Margin="0,8,8,0" Background="Transparent">
+                    <UniformGrid Rows="1" Columns="3">
 
-                                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                                                    <TextBlock Text="{Binding Title}" FontSize="14" Foreground="White" TextWrapping="Wrap"/>
-                                                    <TextBlock Text="{Binding Sub}" FontSize="12" Foreground="#BFBFBF" Margin="0,2,0,0"/>
-                                                </StackPanel>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </Border>
-                        </Popup>
-                    </StackPanel>
-
-                    <!-- 中：問題文（全体は収める / 溢れたらここだけスクロール / スクロールバーなし） -->
-                    <Grid Grid.Column="1" Grid.Row="1" Margin="0,0,8,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0"
-                                   Text="問題文"
-                                   Style="{StaticResource LabelTextStyle}"
-                                   HorizontalAlignment="Center"
-                                   FontSize="34"
-                                   Margin="0,20,0,10"/>
-
-                        <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,0,0,0">
-                            <TextBox x:Name="QuestionTextBox"
-                                     Style="{StaticResource DarkTextBoxStyle}"
-                                     AcceptsReturn="True"
-                                     TextWrapping="WrapWithOverflow"
-                                     Text="問題文を入力してください。"
-                                     Foreground="Gray"
-                                     FontSize="25"
-                                     MinHeight="240"
-                                     GotFocus="Question_GotFocus"
-                                     LostFocus="Question_LostFocus"
-                                     VerticalScrollBarVisibility="Hidden"
-                                     HorizontalScrollBarVisibility="Disabled"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     RequestBringIntoView="QuestionTextBox_RequestBringIntoView"
-                                     PreviewMouseWheel="QuestionTextBox_PreviewMouseWheel"/>
-                        </Border>
-                    </Grid>
-
-                    <!-- 右：設定 -->
-                    <StackPanel Grid.Column="2" Grid.Row="1">
-                        <TextBlock Text="作成者"
-                                   Style="{StaticResource LabelTextStyle}"
-                                   Margin="0,20,0,10"
-                                   FontSize="20"
-                                   HorizontalAlignment="Center"/>
-
-                        <Border Style="{StaticResource SmallFieldBorderStyle}">
+                        <Border Background="#B817181D" CornerRadius="16" BorderBrush="#2A2C34" BorderThickness="1" Padding="10" Margin="0,0,6,10">
                             <Grid>
-                                <TextBox x:Name="CreatedByTextBox"
-                                         Style="{StaticResource DarkTextBoxStyle}"
-                                         FontSize="20"
-                                         MinHeight="52"/>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                                <TextBlock Text="作成者の名前を入力してください"
-                                           Foreground="Gray"
-                                           FontSize="22"
-                                           Margin="10,0,0,0"
-                                           VerticalAlignment="Center"
-                                           IsHitTestVisible="False"
-                                           TextWrapping="Wrap">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ElementName=CreatedByTextBox, Path=Text}" Value="">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+                                <RadioButton x:Name="CorrectRadio1" Content="不正解" GroupName="CorrectChoice"
+                                             Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
+
+                                <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
+                                    <Grid>
+                                        <TextBox x:Name="ChoiceTextBox1" Style="{StaticResource DarkTextBoxStyle}" FontSize="25" MinHeight="60"/>
+                                        <TextBlock Text="選択肢を入力してください"
+                                                   Foreground="Gray"
+                                                   FontSize="24"
+                                                   Margin="10,8,10,0"
+                                                   VerticalAlignment="Top"
+                                                   HorizontalAlignment="Left"
+                                                   IsHitTestVisible="False"
+                                                   TextWrapping="NoWrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ElementName=ChoiceTextBox1, Path=Text}" Value="">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
                             </Grid>
                         </Border>
 
-                        <TextBlock x:Name="HintText" Visibility="Collapsed"/>
-                    </StackPanel>
+                        <Border Background="#B817181D" CornerRadius="16" BorderBrush="#2A2C34" BorderThickness="1" Padding="10" Margin="0,0,6,10">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                    <!-- 下：選択肢 -->
-                    <Border Grid.Column="1" Grid.Row="2" Margin="0,8,8,0" Background="Transparent">
-                        <UniformGrid Rows="1" Columns="3">
+                                <RadioButton x:Name="CorrectRadio2" Content="不正解" GroupName="CorrectChoice"
+                                             Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
 
-                            <Border Background="#B817181D" CornerRadius="16" BorderBrush="#2A2C34" BorderThickness="1" Padding="10" Margin="0,0,6,20">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
+                                <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
+                                    <Grid>
+                                        <TextBox x:Name="ChoiceTextBox2" Style="{StaticResource DarkTextBoxStyle}" FontSize="25" MinHeight="60"/>
+                                        <TextBlock Text="選択肢を入力してください"
+                                                   Foreground="Gray"
+                                                   FontSize="24"
+                                                   Margin="10,8,10,0"
+                                                   VerticalAlignment="Top"
+                                                   HorizontalAlignment="Left"
+                                                   IsHitTestVisible="False"
+                                                   TextWrapping="NoWrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ElementName=ChoiceTextBox2, Path=Text}" Value="">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
 
-                                    <RadioButton x:Name="CorrectRadio1" Content="不正解" GroupName="CorrectChoice"
-                                                 Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
+                        <Border Background="#B817181D" CornerRadius="16" BorderBrush="#2A2C34" BorderThickness="1" Padding="10" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                                    <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
-                                        <Grid>
-                                            <TextBox x:Name="ChoiceTextBox1" Style="{StaticResource DarkTextBoxStyle}" FontSize="25" MinHeight="60"/>
-                                            <TextBlock Text="選択肢を入力してください"
-                                                       Foreground="Gray"
-                                                       FontSize="25"
-                                                       Margin="10,8,10,0"
-                                                       VerticalAlignment="Top"
-                                                       HorizontalAlignment="Left"
-                                                       IsHitTestVisible="False"
-                                                       TextWrapping="NoWrap">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding ElementName=ChoiceTextBox1, Path=Text}" Value="">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                        </Grid>
-                                    </Border>
-                                </Grid>
-                            </Border>
+                                <RadioButton x:Name="CorrectRadio3" Content="不正解" GroupName="CorrectChoice"
+                                             Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
 
-                            <Border Background="#B817181D" CornerRadius="16" BorderBrush="#2A2C34" BorderThickness="1" Padding="10" Margin="0,0,6,20">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
+                                <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
+                                    <Grid>
+                                        <TextBox x:Name="ChoiceTextBox3" Style="{StaticResource DarkTextBoxStyle}" FontSize="25" MinHeight="60"/>
+                                        <TextBlock Text="選択肢を入力してください"
+                                                   Foreground="Gray"
+                                                   FontSize="24"
+                                                   Margin="10,8,10,0"
+                                                   VerticalAlignment="Top"
+                                                   HorizontalAlignment="Left"
+                                                   IsHitTestVisible="False"
+                                                   TextWrapping="NoWrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ElementName=ChoiceTextBox3, Path=Text}" Value="">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
 
-                                    <RadioButton x:Name="CorrectRadio2" Content="不正解" GroupName="CorrectChoice"
-                                                 Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
+                    </UniformGrid>
+                </Border>
 
-                                    <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
-                                        <Grid>
-                                            <TextBox x:Name="ChoiceTextBox2" Style="{StaticResource DarkTextBoxStyle}" FontSize="25" MinHeight="60"/>
-                                            <TextBlock Text="選択肢を入力してください"
-                                                       Foreground="Gray"
-                                                       FontSize="25"
-                                                       Margin="10,8,10,0"
-                                                       VerticalAlignment="Top"
-                                                       HorizontalAlignment="Left"
-                                                       IsHitTestVisible="False"
-                                                       TextWrapping="NoWrap">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding ElementName=ChoiceTextBox2, Path=Text}" Value="">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                        </Grid>
-                                    </Border>
-                                </Grid>
-                            </Border>
+                <!-- 右下：保存/閉じる（間隔が変にならないようにMargin合算をやめる） -->
+                <StackPanel Grid.Column="2" Grid.Row="2">
+                    <Button Content="保存" Height="80" Style="{StaticResource FlatButtonStyle}"
+                            Background="#E50914" Margin="0,8,0,12" Click="Save_Click"/>
+                    <Button Content="閉じる" Height="80" Style="{StaticResource FlatButtonStyle}"
+                            Margin="0,0,0,0" Click="Cancel_Click"/>
+                </StackPanel>
 
-                            <Border Background="#B817181D" CornerRadius="16" BorderBrush="#2A2C34" BorderThickness="1" Padding="10" Margin="0,0,0,20">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-
-                                    <RadioButton x:Name="CorrectRadio3" Content="不正解" GroupName="CorrectChoice"
-                                                 Foreground="#F3F3F3" Checked="CorrectRadio_Checked"/>
-
-                                    <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,6,0,0">
-                                        <Grid>
-                                            <TextBox x:Name="ChoiceTextBox3" Style="{StaticResource DarkTextBoxStyle}" FontSize="25" MinHeight="60"/>
-                                            <TextBlock Text="選択肢を入力してください"
-                                                       Foreground="Gray"
-                                                       FontSize="25"
-                                                       Margin="10,8,10,0"
-                                                       VerticalAlignment="Top"
-                                                       HorizontalAlignment="Left"
-                                                       IsHitTestVisible="False"
-                                                       TextWrapping="NoWrap">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding ElementName=ChoiceTextBox3, Path=Text}" Value="">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                        </Grid>
-                                    </Border>
-                                </Grid>
-                            </Border>
-
-                        </UniformGrid>
-                    </Border>
-
-                    <!-- 右下：保存/キャンセル（150%でも収まるように） -->
-                    <StackPanel Grid.Column="2" Grid.Row="2">
-                        <Button Content="保存" Height="60" Style="{StaticResource FlatButtonStyle}"
-                                Background="#E50914" Margin="0,8,0,0" Click="Save_Click"/>
-                        <Button Content="閉じる" Height="60" Style="{StaticResource FlatButtonStyle}"
-                                Margin="0,12,0,0" Click="Cancel_Click"/>
-                    </StackPanel>
-
-                </Grid>
-            </Border>
-        </ScrollViewer>
+            </Grid>
+        </Border>
     </Grid>
 </Window>
