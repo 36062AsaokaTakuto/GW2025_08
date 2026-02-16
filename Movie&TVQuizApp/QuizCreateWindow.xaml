@@ -81,15 +81,17 @@
     </Window.Resources>
 
     <Grid>
-        <Image x:Name="BackdropImage" Stretch="UniformToFill" Opacity="0.95"/>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="31*"/>
+            <RowDefinition Height="669*"/>
+        </Grid.RowDefinitions>
+        <Image x:Name="BackdropImage" Stretch="UniformToFill" Opacity="0.95" Grid.RowSpan="2"/>
 
         <!-- ★全体はスクロールさせない（問題文だけスクロール） -->
-        <Border Background="#220E0F12"
+        <Border Background="Transparent"
                 Padding="8"
                 CornerRadius="22"
-                Margin="16"
-                HorizontalAlignment="Stretch"
-                VerticalAlignment="Stretch">
+                Margin="16,16,16,16" Grid.RowSpan="2">
 
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -110,7 +112,7 @@
                            x:Name="WorkTitleText"
                            Style="{StaticResource TitleTextStyle}"
                            Text="未選択"
-                           FontSize="44"
+                           FontSize="58"
                            TextWrapping="Wrap"
                            TextAlignment="Center"
                            HorizontalAlignment="Center"
@@ -190,7 +192,7 @@
                                Text="問題文"
                                Style="{StaticResource LabelTextStyle}"
                                HorizontalAlignment="Center"
-                               FontSize="34"
+                               FontSize="45"
                                Margin="0,20,0,10"/>
 
                     <Border Grid.Row="1" Style="{StaticResource SmallFieldBorderStyle}" Margin="0,0,0,30">
@@ -200,15 +202,15 @@
                                  TextWrapping="WrapWithOverflow"
                                  Text="問題文を入力してください。"
                                  Foreground="Gray"
-                                 FontSize="25"
-                                 MinHeight="240"
+                                 FontSize="32"
+                                 MinHeight="200"
                                  GotFocus="Question_GotFocus"
                                  LostFocus="Question_LostFocus"
                                  VerticalScrollBarVisibility="Hidden"
                                  HorizontalScrollBarVisibility="Disabled"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  RequestBringIntoView="QuestionTextBox_RequestBringIntoView"
-                                 PreviewMouseWheel="QuestionTextBox_PreviewMouseWheel"/>
+                                 PreviewMouseWheel="QuestionTextBox_PreviewMouseWheel" Margin="0,-1,0,0"/>
                     </Border>
                 </Grid>
 
@@ -370,11 +372,11 @@
                 </Border>
 
                 <!-- 右下：保存/閉じる（間隔が変にならないようにMargin合算をやめる） -->
-                <StackPanel Grid.Column="2" Grid.Row="2">
+                <StackPanel Grid.Column="2" Grid.Row="2" >
                     <Button Content="保存" Height="80" Style="{StaticResource FlatButtonStyle}"
-                            Background="#E50914" Margin="0,8,0,12" Click="Save_Click"/>
+                            Background="#E50914" Margin="0,8,0,12" Click="Save_Click" FontSize="30"/>
                     <Button Content="閉じる" Height="80" Style="{StaticResource FlatButtonStyle}"
-                            Margin="0,0,0,0" Click="Cancel_Click"/>
+                            Margin="0,0,0,0" Click="Cancel_Click"  FontSize="30"/>
                 </StackPanel>
 
             </Grid>
