@@ -5,6 +5,11 @@ VisualStudioVersion = 17.14.36623.8
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Movie&TVQuizApp", "Movie&TVQuizApp\Movie&TVQuizApp.csproj", "{FC5BF79A-27C9-4199-A02A-81826E3C715F}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ソリューション項目", "ソリューション項目", "{2022CB0F-8BAF-F49E-0C48-8EF4C96EC109}"
+	ProjectSection(SolutionItems) = preProject
+		..\..\..\..\Desktop\卒業制作アイコン\MyApp.ico\android-chrome-512x512_32px.ico = ..\..\..\..\Desktop\卒業制作アイコン\MyApp.ico\android-chrome-512x512_32px.ico
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
