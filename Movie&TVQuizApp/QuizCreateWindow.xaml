@@ -111,7 +111,7 @@
                 <TextBlock Grid.Column="1" Grid.Row="0"
                            x:Name="WorkTitleText"
                            Style="{StaticResource TitleTextStyle}"
-                           Text="未選択"
+                           Text="タイトル(未選択)"
                            FontSize="58"
                            TextWrapping="Wrap"
                            TextAlignment="Center"

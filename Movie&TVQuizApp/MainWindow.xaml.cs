@@ -142,7 +142,9 @@ namespace Movie_AnimeQuizApp {
         private const double LayerScale = 1.35;
         private const double Safety = 2.10;
 
-        private const string PosterSizePath = "/w185";
+        // ★さらに解像度を落とす：/w45
+        private const string PosterSizePath = "/w45";
+
         private readonly SemaphoreSlim _dlGate = new SemaphoreSlim(8);
 
         private readonly Dictionary<string, BitmapSource> _imgCache = new Dictionary<string, BitmapSource>();
@@ -805,10 +807,6 @@ namespace Movie_AnimeQuizApp {
             }
         }
 
-        // =========================
-        // ★修正点：論理スクロール（CanContentScroll=True）では VerticalOffset は「アイテム単位」
-        //          なので startIndex をそのまま使って上端固定する（ピクセル加算をしない）
-        // =========================
         private void ForceQuizSuggestStartFromIndexTop(int startIndex) {
             try {
                 if (QuizSuggestList == null) return;
@@ -827,7 +825,6 @@ namespace Movie_AnimeQuizApp {
                 var sv = FindVisualChild<ScrollViewer>(QuizSuggestList);
                 if (sv == null) return;
 
-                // まずトップに戻す（前回のオフセット残りを消す）
                 sv.ScrollToVerticalOffset(0);
                 QuizSuggestList.UpdateLayout();
 
@@ -836,7 +833,6 @@ namespace Movie_AnimeQuizApp {
                     return;
                 }
 
-                // ★論理スクロール（今回のListBox設定はこれ）→ item indexで固定
                 if (sv.CanContentScroll) {
                     sv.ScrollToVerticalOffset(startIndex);
                     QuizSuggestList.UpdateLayout();
@@ -844,7 +840,6 @@ namespace Movie_AnimeQuizApp {
                     return;
                 }
 
-                // ★物理スクロールの場合のみピクセル推定でフォールバック
                 double off = startIndex * QuizSuggestEstimatedRowHeight;
                 sv.ScrollToVerticalOffset(off);
                 QuizSuggestList.UpdateLayout();
@@ -1102,7 +1097,7 @@ namespace Movie_AnimeQuizApp {
             }
 
             if (!s.StartsWith("/")) s = "/" + s;
-            return "https://image.tmdb.org/t/p/w92" + s;
+            return "https://image.tmdb.org/t/p/w45" + s;
         }
 
         public class QuizSuggestItem {
@@ -1469,7 +1464,7 @@ namespace Movie_AnimeQuizApp {
         private static string BuildPosterThumbUrl(string posterPath) {
             if (string.IsNullOrWhiteSpace(posterPath)) return "";
             if (!posterPath.StartsWith("/")) posterPath = "/" + posterPath;
-            return "https://image.tmdb.org/t/p/w92" + posterPath;
+            return "https://image.tmdb.org/t/p/w45" + posterPath;
         }
 
         public class SuggestItem {
@@ -1816,7 +1811,8 @@ namespace Movie_AnimeQuizApp {
                     byte[] bytes = await _http.GetByteArrayAsync(url);
                     if (token.IsCancellationRequested) return;
 
-                    BitmapSource bmp = CreateFrozenBitmap(bytes, (int)(TileW * 2));
+                    // ★さらに落とす：デコード幅も小さめ
+                    BitmapSource bmp = CreateFrozenBitmap(bytes, 40);
 
                     lock (_cacheLock) {
                         if (!_imgCache.ContainsKey(url))
