@@ -420,9 +420,12 @@ namespace Movie_AnimeQuizApp {
 
             if (work == null) return;
 
-            List<Quiz> quizzes = await AppDb.Connection.Table<Quiz>()
+            List<Quiz> quizzesAll = await AppDb.Connection.Table<Quiz>()
                 .Where(q => q.WorkKey == work.WorkKey)
                 .ToListAsync();
+
+            // ★未完成（下書き）を除外（Questionっぽいプロパティが存在する場合だけ）
+            var quizzes = FilterPlayableQuizzesByReflection(quizzesAll);
 
             if (quizzes == null || quizzes.Count <= 0) return;
 
@@ -456,9 +459,12 @@ namespace Movie_AnimeQuizApp {
                 await AppDb.InitAsync();
 
                 // クイズ一覧
-                var quizzes = await AppDb.Connection.Table<Quiz>()
+                var quizzesAll = await AppDb.Connection.Table<Quiz>()
                     .Where(q => q.WorkKey == wk)
                     .ToListAsync();
+
+                // ★未完成（下書き）を除外
+                var quizzes = FilterPlayableQuizzesByReflection(quizzesAll);
 
                 if (quizzes == null || quizzes.Count == 0) return;
 
@@ -573,6 +579,9 @@ namespace Movie_AnimeQuizApp {
             });
         }
 
+        // =========================
+        // ★ここが本命：PRAGMAで列名を拾って「未完成っぽい行」を除外して集計する
+        // =========================
         private async Task EnsureQuizWorkIndexAsync(CancellationToken token) {
             if (_quizWorkIndex != null) return;
 
@@ -582,15 +591,74 @@ namespace Movie_AnimeQuizApp {
 
                 await AppDb.InitAsync();
 
+                var quizCols = await GetTableInfoAsync("Quiz"); // name->type
+                string questionCol = PickFirstExisting(quizCols,
+                    "Question", "QuizQuestion", "QuestionText", "QuizText", "Text", "Problem", "Body", "Q");
+
+                string answerCol = PickFirstExisting(quizCols,
+                    "Answer", "CorrectAnswer", "Correct", "CorrectText", "CorrectOption", "A");
+
+                // choice類（あれば最低1つは埋まってるものだけ数える）
+                var choiceCols = PickExistingMany(quizCols,
+                    "Choice1", "Choice2", "Choice3", "Choice4",
+                    "Option1", "Option2", "Option3", "Option4",
+                    "ChoiceA", "ChoiceB", "ChoiceC", "ChoiceD",
+                    "A1", "A2", "A3", "A4");
+
+                string isDeletedCol = PickFirstExisting(quizCols, "IsDeleted", "Deleted");
+                string isDraftCol = PickFirstExisting(quizCols, "IsDraft", "Draft", "IsTemp", "Temp");
+
+                var whereParts = new List<string>();
+                whereParts.Add("TRIM(IFNULL(WorkKey,'')) <> ''");
+
+                if (!string.IsNullOrWhiteSpace(questionCol)) {
+                    whereParts.Add("TRIM(IFNULL([" + questionCol + "],'')) <> ''");
+                }
+
+                if (!string.IsNullOrWhiteSpace(answerCol)) {
+                    // 型が整数っぽいなら -1 を未設定扱いにして除外（0は許可）
+                    string t = quizCols.ContainsKey(answerCol) ? (quizCols[answerCol] ?? "") : "";
+                    if (t.IndexOf("INT", StringComparison.OrdinalIgnoreCase) >= 0) {
+                        whereParts.Add("IFNULL([" + answerCol + "], -1) >= 0");
+                    } else {
+                        whereParts.Add("TRIM(IFNULL([" + answerCol + "],'')) <> ''");
+                    }
+                }
+
+                if (choiceCols.Count > 0) {
+                    // 1つも選択肢が無い下書きを除外
+                    var orParts = new List<string>();
+                    for (int i = 0; i < choiceCols.Count; i++) {
+                        orParts.Add("TRIM(IFNULL([" + choiceCols[i] + "],'')) <> ''");
+                    }
+                    whereParts.Add("(" + string.Join(" OR ", orParts) + ")");
+                }
+
+                if (!string.IsNullOrWhiteSpace(isDeletedCol)) {
+                    whereParts.Add("IFNULL([" + isDeletedCol + "], 0) = 0");
+                }
+
+                if (!string.IsNullOrWhiteSpace(isDraftCol)) {
+                    whereParts.Add("IFNULL([" + isDraftCol + "], 0) = 0");
+                }
+
+                string whereSql = (whereParts.Count > 0) ? ("WHERE " + string.Join(" AND ", whereParts)) : "";
+
                 // ★クイズ数がズレないように：Quizを集計してWorkへJOIN（QuizIdでDISTINCT）
-                var rows = await AppDb.Connection.QueryAsync<QuizWorkIndexRow>(
+                string sql =
                     "SELECT w.WorkKey as WorkKey, w.Title as Title, w.PosterPath as PosterPath, w.MediaType as MediaType, w.ReleaseDate as ReleaseDate, " +
                     "qc.QuizCount as QuizCount " +
                     "FROM [Work] w " +
-                    "JOIN (SELECT WorkKey, COUNT(DISTINCT QuizId) as QuizCount FROM Quiz GROUP BY WorkKey) qc " +
+                    "JOIN ( " +
+                    "   SELECT WorkKey, COUNT(DISTINCT QuizId) as QuizCount " +
+                    "   FROM Quiz " +
+                    "   " + whereSql + " " +
+                    "   GROUP BY WorkKey " +
+                    ") qc " +
                     "ON (qc.WorkKey COLLATE BINARY) = (w.WorkKey COLLATE BINARY) " +
-                    "ORDER BY w.Title COLLATE NOCASE"
-                );
+                    "ORDER BY w.Title COLLATE NOCASE";
+
+                var rows = await AppDb.Connection.QueryAsync<QuizWorkIndexRow>(sql);
 
                 var list = new List<QuizWorkIndexItem>();
                 if (rows != null) {
@@ -622,6 +690,46 @@ namespace Movie_AnimeQuizApp {
             }
         }
 
+        // PRAGMA table_info で列を取る（name->type）
+        private async Task<Dictionary<string, string>> GetTableInfoAsync(string tableName) {
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try {
+                var rows = await AppDb.Connection.QueryAsync<TableInfoRow>("PRAGMA table_info('" + tableName + "')");
+                if (rows != null) {
+                    for (int i = 0; i < rows.Count; i++) {
+                        var r = rows[i];
+                        if (r == null) continue;
+                        if (string.IsNullOrWhiteSpace(r.name)) continue;
+                        if (!dict.ContainsKey(r.name)) dict[r.name] = r.type ?? "";
+                    }
+                }
+            }
+            catch { }
+            return dict;
+        }
+
+        private string PickFirstExisting(Dictionary<string, string> cols, params string[] candidates) {
+            if (cols == null || cols.Count == 0 || candidates == null) return null;
+            for (int i = 0; i < candidates.Length; i++) {
+                var c = candidates[i];
+                if (string.IsNullOrWhiteSpace(c)) continue;
+                if (cols.ContainsKey(c)) return c;
+            }
+            return null;
+        }
+
+        private List<string> PickExistingMany(Dictionary<string, string> cols, params string[] candidates) {
+            var ret = new List<string>();
+            if (cols == null || cols.Count == 0 || candidates == null) return ret;
+
+            for (int i = 0; i < candidates.Length; i++) {
+                var c = candidates[i];
+                if (string.IsNullOrWhiteSpace(c)) continue;
+                if (cols.ContainsKey(c)) ret.Add(c);
+            }
+            return ret;
+        }
+
         private static string BuildSubByQuizCount(int quizCount) {
             return "クイズ数：" + Math.Max(0, quizCount).ToString(CultureInfo.InvariantCulture);
         }
@@ -630,6 +738,7 @@ namespace Movie_AnimeQuizApp {
             var ret = new List<QuizWorkSuggestItem>();
 
             try {
+                // ★毎回ここで index を保証（初回でも確実に“除外条件付き”集計が効く）
                 await EnsureQuizWorkIndexAsync(token);
                 if (token.IsCancellationRequested) return ret;
 
@@ -906,6 +1015,70 @@ namespace Movie_AnimeQuizApp {
             return raw;
         }
 
+        // ★Quizの「未完成下書き」を除外（プロパティ名が何でも落ちない）
+        private List<Quiz> FilterPlayableQuizzesByReflection(List<Quiz> quizzes) {
+            if (quizzes == null) return new List<Quiz>();
+
+            try {
+                var t = typeof(Quiz);
+                var props = t.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+                Func<string, System.Reflection.PropertyInfo> find = (name) =>
+                    props.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+                // よくある名前を順に探す
+                var qProp = find("Question") ?? find("QuizQuestion") ?? find("QuestionText") ?? find("QuizText") ?? find("Text") ?? find("Problem") ?? find("Body") ?? find("Q");
+                var aProp = find("Answer") ?? find("CorrectAnswer") ?? find("Correct") ?? find("CorrectText") ?? find("CorrectOption") ?? find("A");
+
+                // 下書きフラグ系
+                var delProp = find("IsDeleted") ?? find("Deleted");
+                var draftProp = find("IsDraft") ?? find("Draft") ?? find("IsTemp") ?? find("Temp");
+
+                var ret = new List<Quiz>();
+
+                for (int i = 0; i < quizzes.Count; i++) {
+                    var one = quizzes[i];
+                    if (one == null) continue;
+
+                    // delete/draft
+                    if (delProp != null) {
+                        var v = delProp.GetValue(one);
+                        if (v is bool b && b) continue;
+                        if (v is int bi && bi != 0) continue;
+                    }
+                    if (draftProp != null) {
+                        var v = draftProp.GetValue(one);
+                        if (v is bool b && b) continue;
+                        if (v is int bi && bi != 0) continue;
+                    }
+
+                    if (qProp != null) {
+                        var v = qProp.GetValue(one);
+                        string s = (v == null) ? "" : v.ToString();
+                        if (string.IsNullOrWhiteSpace(s)) continue;
+                    }
+
+                    if (aProp != null) {
+                        var v = aProp.GetValue(one);
+                        // int系なら -1 を未設定扱い。0は有効にする
+                        if (v is int ai) {
+                            if (ai < 0) continue;
+                        } else {
+                            string s = (v == null) ? "" : v.ToString();
+                            if (string.IsNullOrWhiteSpace(s)) continue;
+                        }
+                    }
+
+                    ret.Add(one);
+                }
+
+                return ret;
+            }
+            catch {
+                return quizzes ?? new List<Quiz>();
+            }
+        }
+
         public class QuizWorkSuggestItem {
             public string WorkKey { get; set; }
             public string Title { get; set; }
@@ -939,6 +1112,16 @@ namespace Movie_AnimeQuizApp {
             public int QuizCount { get; set; }
 
             public string NormTitle { get; set; }
+        }
+
+        // PRAGMA table_info row
+        private class TableInfoRow {
+            public int cid { get; set; }
+            public string name { get; set; }
+            public string type { get; set; }
+            public int notnull { get; set; }
+            public string dflt_value { get; set; }
+            public int pk { get; set; }
         }
 
         // クイズ作成

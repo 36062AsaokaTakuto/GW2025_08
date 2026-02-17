@@ -434,7 +434,7 @@
                                      BorderThickness="0"
                                      Foreground="White"
                                      SelectionMode="Single"
-                                     MaxHeight="820"
+                                     MaxHeight="480"
                                      ScrollViewer.VerticalScrollBarVisibility="Hidden"
                                      ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                                      ScrollViewer.CanContentScroll="True"

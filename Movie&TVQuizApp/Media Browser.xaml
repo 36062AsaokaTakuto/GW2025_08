@@ -440,13 +440,13 @@
                         Background="#DD111111"
                         CornerRadius="10"
                         BorderBrush="#2A2A2A"
-                        BorderThickness="1">
+                        BorderThickness="1"
+                        MaxHeight="480">
                     <ListBox x:Name="QuizWorkSuggestList"
                              Background="Transparent"
                              BorderThickness="0"
                              Foreground="White"
-                             SelectionMode="Single"
-                             MaxHeight="900"
+                             SelectionMode="Single"                             
                              ScrollViewer.VerticalScrollBarVisibility="Hidden"
                              ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                              MouseLeftButtonUp="QuizWorkSuggestList_MouseLeftButtonUp">
