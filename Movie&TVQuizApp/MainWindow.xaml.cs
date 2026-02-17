@@ -973,7 +973,7 @@ namespace Movie_AnimeQuizApp {
                             WorkKey = r.WorkKey ?? "",
                             Title = title,
                             PosterThumbUrl = BuildPosterThumbUrlFromStored(r.PosterPath),
-                            Sub = "クイズ数: " + r.QuizCount.ToString()
+                            Sub = BuildSubByQuizCount(r.QuizCount)
                         });
                     }
 
@@ -1041,7 +1041,7 @@ namespace Movie_AnimeQuizApp {
                             WorkKey = r.WorkKey ?? "",
                             Title = title,
                             PosterThumbUrl = BuildPosterThumbUrlFromStored(r.PosterPath),
-                            Sub = "クイズ数: " + r.QuizCount.ToString()
+                            Sub = BuildSubByQuizCount(r.QuizCount)
                         });
                     }
 
@@ -1098,6 +1098,11 @@ namespace Movie_AnimeQuizApp {
 
             if (!s.StartsWith("/")) s = "/" + s;
             return "https://image.tmdb.org/t/p/w45" + s;
+        }
+
+        // ★SearchResultWindow の「クイズ数」表示ロジックを MainWindow に反映
+        private static string BuildSubByQuizCount(int quizCount) {
+            return "クイズ数：" + Math.Max(0, quizCount).ToString(CultureInfo.InvariantCulture);
         }
 
         public class QuizSuggestItem {

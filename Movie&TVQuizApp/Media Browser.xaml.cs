@@ -1,4 +1,5 @@
-﻿using Movie_AnimeQuizApp.Data;
+﻿// MediaBrowser.xaml.cs
+using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Newtonsoft.Json.Linq;
 using System;
@@ -10,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -129,7 +131,6 @@ namespace Movie_AnimeQuizApp {
                 QuizWorkSuggestList.ItemsSource = _quizWorkSuggestions;
 
                 // ★「3件くらいしか見えない」対策：MainWindowに近い表示量（約10件分見える高さ）
-                // （XAMLは触らず、コードで設定）
                 QuizWorkSuggestList.MaxHeight = 900;
 
                 // ★候補クリックを確実に拾う（handledでも拾う）
@@ -648,16 +649,49 @@ namespace Movie_AnimeQuizApp {
                 await AppDb.InitAsync();
                 if (token.IsCancellationRequested) return;
 
-                // ★クイズ数ズレ対策：QuizIdの重複を除外して数える
-                var rows = await AppDb.Connection.QueryAsync<QuizSuggestRow>(
-                    "SELECT w.WorkKey as WorkKey, w.Title as Title, w.PosterPath as PosterPath, qc.QuizCount as QuizCount " +
-                    "FROM [Work] w " +
-                    "JOIN (SELECT WorkKey, COUNT(DISTINCT QuizId) as QuizCount FROM Quiz GROUP BY WorkKey) qc " +
-                    "ON (qc.WorkKey COLLATE BINARY) = (w.WorkKey COLLATE BINARY) " +
-                    "ORDER BY w.Title COLLATE NOCASE"
-                );
+                List<QuizCountRow> rows = null;
 
-                _quizIndex = rows ?? new List<QuizSuggestRow>();
+                // まず「空クイズ（Question空）」を除外して数える（下書き/ゴミ行対策）
+                try {
+                    rows = await AppDb.Connection.QueryAsync<QuizCountRow>(
+                        "SELECT w.WorkKey as WorkKey, w.Title as Title, w.PosterPath as PosterPath, qc.QuizCount as QuizCount " +
+                        "FROM [Work] w " +
+                        "JOIN ( " +
+                        "   SELECT WorkKey, COUNT(DISTINCT QuizId) as QuizCount " +
+                        "   FROM Quiz " +
+                        "   WHERE TRIM(IFNULL(Question,'')) <> '' " +
+                        "   GROUP BY WorkKey " +
+                        ") qc " +
+                        "ON (qc.WorkKey COLLATE BINARY) = (w.WorkKey COLLATE BINARY) " +
+                        "ORDER BY w.Title COLLATE NOCASE"
+                    );
+                }
+                catch {
+                    // Question列が無い等で失敗したら従来のカウントに戻す（候補が消えない）
+                    rows = await AppDb.Connection.QueryAsync<QuizCountRow>(
+                        "SELECT w.WorkKey as WorkKey, w.Title as Title, w.PosterPath as PosterPath, qc.QuizCount as QuizCount " +
+                        "FROM [Work] w " +
+                        "JOIN ( " +
+                        "   SELECT WorkKey, COUNT(DISTINCT QuizId) as QuizCount " +
+                        "   FROM Quiz " +
+                        "   GROUP BY WorkKey " +
+                        ") qc " +
+                        "ON (qc.WorkKey COLLATE BINARY) = (w.WorkKey COLLATE BINARY) " +
+                        "ORDER BY w.Title COLLATE NOCASE"
+                    );
+                }
+
+                var list = (rows ?? new List<QuizCountRow>())
+                    .Where(r => r != null && !string.IsNullOrWhiteSpace(r.Title))
+                    .Select(r => new QuizSuggestRow {
+                        WorkKey = r.WorkKey ?? "",
+                        Title = r.Title ?? "",
+                        PosterPath = r.PosterPath ?? "",
+                        QuizCount = Math.Max(0, r.QuizCount)
+                    })
+                    .ToList();
+
+                _quizIndex = list;
                 _quizIndexLoaded = true;
             }
             catch {
@@ -667,6 +701,56 @@ namespace Movie_AnimeQuizApp {
             finally {
                 _quizIndexGate.Release();
             }
+        }
+
+        private class QuizCountRow {
+            public string WorkKey { get; set; }
+            public string Title { get; set; }
+            public string PosterPath { get; set; }
+            public int QuizCount { get; set; }
+        }
+
+        // ★起動直後に「同じ質問が別行扱い」で2になるのを潰すための正規化
+        private static string NormalizeQuizQuestion(string s) {
+            if (string.IsNullOrWhiteSpace(s)) return "";
+
+            // 改行/タブ/全角空白をスペースへ
+            s = s.Replace('\r', ' ')
+                 .Replace('\n', ' ')
+                 .Replace('\t', ' ')
+                 .Replace('　', ' ');
+
+            s = s.Trim();
+            if (s.Length == 0) return "";
+
+            // 連続空白を1つに、英字は小文字に寄せる（日本語はそのまま）
+            var sb = new StringBuilder(s.Length);
+            bool inSpace = false;
+
+            for (int i = 0; i < s.Length; i++) {
+                char ch = s[i];
+                if (char.IsWhiteSpace(ch)) {
+                    if (!inSpace) {
+                        sb.Append(' ');
+                        inSpace = true;
+                    }
+                    continue;
+                }
+
+                inSpace = false;
+                sb.Append(char.ToLowerInvariant(ch));
+            }
+
+            return sb.ToString().Trim();
+        }
+
+        private void InvalidateQuizIndex() {
+            // インデックスだけ捨てる（候補UIは消さない）
+            _quizIndexLoaded = false;
+            _quizIndex = new List<QuizSuggestRow>();
+
+            // 既存候補を「キャッシュ扱い」にしないため
+            _lastSuggestQueryText = null;
         }
 
         private async Task RunQuizSuggestEmptyAsync() {
@@ -711,7 +795,7 @@ namespace Movie_AnimeQuizApp {
                             WorkKey = r.WorkKey ?? "",
                             Title = r.Title ?? "",
                             PosterThumbUrl = BuildPosterThumbUrlFromStoredPath(r.PosterPath),
-                            Sub = "クイズ数：" + r.QuizCount.ToString()
+                            Sub = BuildSubByQuizCount(r.QuizCount)
                         })
                         .ToList();
                 }, token);
@@ -790,7 +874,7 @@ namespace Movie_AnimeQuizApp {
                             WorkKey = r.WorkKey ?? "",
                             Title = title,
                             PosterThumbUrl = BuildPosterThumbUrlFromStoredPath(r.PosterPath),
-                            Sub = "クイズ数：" + r.QuizCount.ToString()
+                            Sub = BuildSubByQuizCount(r.QuizCount)
                         });
                     }
 
@@ -1012,6 +1096,10 @@ namespace Movie_AnimeQuizApp {
             return "https://image.tmdb.org/t/p/w92" + p;
         }
 
+        private static string BuildSubByQuizCount(int quizCount) {
+            return "クイズ数：" + Math.Max(0, quizCount).ToString(CultureInfo.InvariantCulture);
+        }
+
         private class QuizWorkSuggestItem {
             public string WorkKey { get; set; }
             public string Title { get; set; }
@@ -1024,6 +1112,20 @@ namespace Movie_AnimeQuizApp {
             public string Title { get; set; }
             public string PosterPath { get; set; }
             public int QuizCount { get; set; }
+        }
+
+        private class QuizIndexJoinRow {
+            public string WorkKey { get; set; }
+            public string Title { get; set; }
+            public string PosterPath { get; set; }
+            public string Question { get; set; }
+        }
+
+        private class QuizIndexAgg {
+            public string WorkKey { get; set; }
+            public string Title { get; set; }
+            public string PosterPath { get; set; }
+            public HashSet<string> QuestionSet { get; set; }
         }
 
         // =========================================================
@@ -1586,6 +1688,9 @@ namespace Movie_AnimeQuizApp {
             w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
             w.ShowDialog();
+
+            // ★削除後は必ずインデックス捨てる（次回候補のクイズ数を最新に）
+            InvalidateQuizIndex();
         }
 
         // ★XAMLが呼んでるので必須（クイズ作成）
@@ -1611,6 +1716,9 @@ namespace Movie_AnimeQuizApp {
             w.Closed += (_, __) => {
                 if (AppNav.ForceMain) return;
                 try { this.Show(); this.Activate(); } catch { }
+
+                // ★作成後も必ず捨てる
+                InvalidateQuizIndex();
             };
 
             w.WindowState = WindowState.Maximized;
