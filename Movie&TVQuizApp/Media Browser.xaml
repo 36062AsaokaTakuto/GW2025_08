@@ -93,6 +93,16 @@
         <DataTemplate x:Key="BrowserItemTemplate">
             <Grid Margin="6">
 
+                <!-- ★ホバー時の背景（作品カードと同サイズ） -->
+                <Border x:Name="HoverBack"
+                    Background="Red"
+                    CornerRadius="14"
+                    Height="470"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Top"
+                    Opacity="0"
+                    IsHitTestVisible="False"/>
+
                 <!-- 通常カード -->
                 <Button x:Name="MediaBtn"
                         Click="MediaCard_Click"
@@ -100,7 +110,15 @@
                         BorderThickness="0"
                         Padding="0"
                         HorizontalAlignment="Stretch"
-                        VerticalAlignment="Top">
+                        VerticalAlignment="Top"
+                        FocusVisualStyle="{x:Null}">
+                    <!-- ★Button既定のMouseOver/Focusの明るい矩形を出さない -->
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <ContentPresenter/>
+                        </ControlTemplate>
+                    </Button.Template>
+
                     <Border Background="#151515"
                             BorderBrush="#2A2A2A"
                             BorderThickness="1"
@@ -157,7 +175,6 @@
 
                                     <Ellipse Fill="#0B0B0B" Stroke="#2E2E2E" StrokeThickness="2"/>
 
-                                    <!-- ★変更点：グレー円と緑円が「同じ半径」で完全に重なるように（Margin をなくす） -->
                                     <Ellipse Stroke="#2F2F2F" StrokeThickness="6" Fill="Transparent" Margin="0"/>
 
                                     <Path Stroke="LimeGreen"
@@ -202,7 +219,15 @@
                         BorderThickness="0"
                         Padding="0"
                         HorizontalAlignment="Stretch"
-                        VerticalAlignment="Top">
+                        VerticalAlignment="Top"
+                        FocusVisualStyle="{x:Null}">
+                    <!-- ★Button既定のMouseOver/Focusの明るい矩形を出さない -->
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <ContentPresenter/>
+                        </ControlTemplate>
+                    </Button.Template>
+
                     <Border Background="#151515"
                             BorderBrush="#2A2A2A"
                             BorderThickness="1"
@@ -254,6 +279,15 @@
                 </Button>
 
             </Grid>
+
+            <DataTemplate.Triggers>
+                <Trigger SourceName="MediaBtn" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="HoverBack" Property="Opacity" Value="1"/>
+                </Trigger>
+                <Trigger SourceName="LoadMoreBtn" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="HoverBack" Property="Opacity" Value="1"/>
+                </Trigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
 
     </Window.Resources>
@@ -261,7 +295,6 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="60"/>
-            <!-- ★ここを Auto に戻す：検索ボックス表示時だけ下を押し下げる -->
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -326,7 +359,7 @@
             </Grid>
         </Border>
 
-        <!-- ★検索ボックス：ここは「押し下げる」ため Row=1 に置く -->
+        <!-- ★検索ボックス：Row=1 -->
         <Grid Grid.Row="1" Margin="0,0,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
@@ -335,8 +368,6 @@
                 <ColumnDefinition Width="80"/>
             </Grid.ColumnDefinitions>
 
-            <!-- ★クイズ検索パネル（TextBox部分まで） -->
-            <!-- ※上に出るメニュー（ボタン列）の高さ分だけ下げる -->
             <Border x:Name="QuizSearchPanel"
                     Grid.Column="2"
                     Visibility="Collapsed"
@@ -347,8 +378,6 @@
                     MouseLeave="QuizSearchPanel_MouseLeave">
 
                 <StackPanel Width="340">
-
-                    <!-- 検索BOX -->
                     <Border x:Name="QuizSearchBoxBorder"
                             Background="#66000000"
                             BorderBrush="#808080"
@@ -372,7 +401,6 @@
                                      PreviewMouseLeftButtonDown="QuizSearch_PreviewMouseLeftButtonDown"
                                      TextChanged="QuizSearch_TextChanged"/>
 
-                            <!-- プレースホルダー（MainWindowと同じ：TextBlockクリックも拾って1回で候補表示） -->
                             <TextBlock Text="クイズしたい作品名を入力"
                                        Foreground="Gray"
                                        FontSize="16"
@@ -393,11 +421,9 @@
                             </TextBlock>
                         </Grid>
                     </Border>
-
                 </StackPanel>
             </Border>
 
-            <!-- ★候補リストは Popup：ここだけ「かぶる」（押し下げない） -->
             <Popup x:Name="QuizWorkSuggestPopup"
                    PlacementTarget="{Binding ElementName=QuizSearchBoxBorder}"
                    Placement="Bottom"
@@ -449,7 +475,7 @@
 
         </Grid>
 
-        <!-- ★メニュー（映画/TV/クイズ）はオーバーレイのまま：下は押さない -->
+        <!-- ★メニュー（映画/TV/クイズ）はオーバーレイのまま -->
         <Grid Grid.Row="0"
               Grid.RowSpan="4"
               Panel.ZIndex="999"
@@ -501,9 +527,6 @@
                         MouseEnter="Menu_MouseEnter"
                         MouseLeave="Menu_MouseLeave">
                     <StackPanel Orientation="Vertical">
-
-                        <!-- 上：クイズ回答/作成/削除 -->
-                        <!-- ★小さい画面でも1行で見切れないように、ここだけ Viewbox で自動縮小 -->
                         <Viewbox Stretch="Uniform"
                                  StretchDirection="DownOnly"
                                  HorizontalAlignment="Stretch">
@@ -524,8 +547,6 @@
                                         Click="QuizDelete_Click"/>
                             </StackPanel>
                         </Viewbox>
-
-                        <!-- ★下の検索Panelは Row=1 に移したのでここには置かない -->
                     </StackPanel>
                 </Border>
 
@@ -614,7 +635,6 @@
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel>
 
-                    <!-- 一覧（今まで通り） -->
                     <ItemsControl ItemsSource="{Binding Items}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>

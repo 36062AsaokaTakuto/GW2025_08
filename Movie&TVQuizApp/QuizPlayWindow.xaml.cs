@@ -1,4 +1,5 @@
-﻿using Movie_AnimeQuizApp.Data;
+﻿// QuizPlayWindow.xaml.cs
+using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Movie_AnimeQuizApp.QuizRuntime;
 using System;
@@ -8,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -386,6 +388,79 @@ namespace Movie_AnimeQuizApp.Views {
             catch { }
 
             Close();
+        }
+
+        // 戻る：検索文字をクリアして、呼び出し元へ戻る
+        private void BackButton_Click(object sender, RoutedEventArgs e) {
+            if (_isClosingOrNavigating) return;
+
+            _isClosingOrNavigating = true;
+            StopTimer();
+            try { _imageCts?.Cancel(); } catch { }
+
+            ClearQuizSearchText();
+
+            try {
+                // 基本は Owner（呼び出し元）
+                var back = this.Owner;
+
+                // Owner が無い/死んでる場合の保険：MainWindow を探す
+                if (back == null && Application.Current != null) {
+                    foreach (Window w in Application.Current.Windows) {
+                        if (w == null) continue;
+                        if (w == this) continue;
+                        if (w.GetType().Name == "MainWindow") { back = w; break; }
+                    }
+                }
+
+                if (back != null) {
+                    try { back.Show(); } catch { }
+                    try { back.Activate(); } catch { }
+                }
+            }
+            catch { }
+
+            Close();
+        }
+
+        private void ClearQuizSearchText() {
+            try {
+                // まず戻り先（Owner優先）
+                Window target = this.Owner;
+
+                if (target == null && Application.Current != null) {
+                    foreach (Window w in Application.Current.Windows) {
+                        if (w == null) continue;
+                        if (w == this) continue;
+                        if (w.GetType().Name == "MainWindow") { target = w; break; }
+                    }
+                }
+
+                if (target == null) return;
+
+                // 1) ClearQuizSearchText() を持っていれば呼ぶ
+                var mi = target.GetType().GetMethod(
+                    "ClearQuizSearchText",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                if (mi != null && mi.GetParameters().Length == 0) {
+                    mi.Invoke(target, null);
+                    return;
+                }
+
+                // 2) QuizSearchTextBox というフィールドがあれば Text を空にする
+                var fi = target.GetType().GetField(
+                    "QuizSearchTextBox",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                if (fi != null) {
+                    var tb = fi.GetValue(target) as TextBox;
+                    if (tb != null) {
+                        tb.Text = "";
+                    }
+                }
+            }
+            catch { }
         }
 
         // ★追加：閉じる（必ず QuizPlayWindow を呼んだ画面へ戻す）

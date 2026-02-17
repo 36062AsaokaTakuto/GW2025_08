@@ -1,9 +1,4 @@
-﻿// MediaBrowser.xaml.cs
-// ※MainWindowでこのチャット内に指示された変更（プレースホルダーTextBlockクリックで1回で候補、空欄1クリックで候補、外クリック判定、候補Popup、など）を同じ挙動で反映
-// ※「人気/上映中/放送中」押下時は必ず一覧を最上部へ
-// ※それ以外は変更しない
-
-using Movie_AnimeQuizApp.Data;
+﻿using Movie_AnimeQuizApp.Data;
 using Movie_AnimeQuizApp.Data.Entities;
 using Newtonsoft.Json.Linq;
 using System;
