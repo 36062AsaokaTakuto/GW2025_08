@@ -61,6 +61,31 @@ namespace Movie_AnimeQuizApp {
                 new PropertyMetadata(200.0));
 
         // =====================================================
+        // ★追加：画面遷移時に「一瞬デスクトップが見える」を防ぐ（次ウィンドウ描画後にHide）
+        // =====================================================
+        private bool _hideScheduled = false;
+
+        private void HideAfterNextWindowRendered(Window nextWindow) {
+            if (_hideScheduled) return;
+            _hideScheduled = true;
+
+            if (nextWindow == null) return;
+
+            this.IsEnabled = false;
+
+            EventHandler handler = null;
+            handler = (s, e) => {
+                try { nextWindow.ContentRendered -= handler; } catch { }
+
+                if (AppNav.ForceMain) return;
+
+                try { this.Hide(); } catch { }
+            };
+
+            nextWindow.ContentRendered += handler;
+        }
+
+        // =====================================================
         // ★かな/幅/大小を無視して比較（MainWindowと同じ）
         // =====================================================
         private static readonly CompareInfo _jaComp = CultureInfo.GetCultureInfo("ja-JP").CompareInfo;
@@ -219,10 +244,23 @@ namespace Movie_AnimeQuizApp {
             SearchResultWindow detail = new SearchResultWindow(row.Media.Id, row.Media.MediaType, ApiKey);
             detail.Owner = this;
 
-            this.Hide();
+            // ★デスクトップがチラ見えする原因は「先にこのウィンドウをHide」していたため。
+            //   先に詳細ウィンドウを表示し、描画(ContentRendered)されたタイミングでこの画面をHideする。
+            this.IsEnabled = false;
+
+            detail.ContentRendered += (_, __) => {
+                if (AppNav.ForceMain) return;
+                try { this.Hide(); } catch { }
+            };
+
             detail.Closed += (_, __) => {
                 if (AppNav.ForceMain) return;
-                try { this.Show(); this.Activate(); } catch { }
+                try {
+                    this.IsEnabled = true;
+                    this.Show();
+                    this.Activate();
+                }
+                catch { }
             };
 
             detail.WindowState = WindowState.Maximized;
@@ -234,7 +272,26 @@ namespace Movie_AnimeQuizApp {
         // =========================================================
         private void Home_Click(object sender, RoutedEventArgs e) {
             ClearQuizSearchUi();
-            AppNav.GoHome(this);
+
+            // ★可能なら先にMainWindowを表示してからHomeへ（デスクトップちら見え防止）
+            try {
+                Window main = null;
+                if (Application.Current != null) {
+                    foreach (Window w in Application.Current.Windows) {
+                        if (w == null) continue;
+                        if (w.GetType().Name == "MainWindow") { main = w; break; }
+                    }
+                }
+                if (main != null) {
+                    try { main.Show(); } catch { }
+                    try { main.Activate(); } catch { }
+                }
+            }
+            catch { }
+
+            Dispatcher.BeginInvoke(new Action(() => {
+                AppNav.GoHome(this);
+            }), DispatcherPriority.Background);
         }
 
         // =========================================================
@@ -1158,10 +1215,19 @@ namespace Movie_AnimeQuizApp {
 
                 quizWin.Owner = this;
 
-                this.Hide();
+                // ★先に次ウィンドウを表示し、描画後にHide（デスクトップちら見え防止）
+                _hideScheduled = false;
+                HideAfterNextWindowRendered(quizWin);
+
                 quizWin.Closed += (_, __) => {
                     if (AppNav.ForceMain) return;
-                    try { this.Show(); this.Activate(); } catch { }
+                    try {
+                        this.IsEnabled = true;
+                        this.Show();
+                        this.Activate();
+                        _hideScheduled = false;
+                    }
+                    catch { }
                 };
 
                 quizWin.WindowState = WindowState.Maximized;
@@ -1712,10 +1778,19 @@ namespace Movie_AnimeQuizApp {
             w.Owner = this;
             w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
-            this.Hide();
+            // ★先に次ウィンドウを表示し、描画後にHide（デスクトップちら見え防止）
+            _hideScheduled = false;
+            HideAfterNextWindowRendered(w);
+
             w.Closed += (_, __) => {
                 if (AppNav.ForceMain) return;
-                try { this.Show(); this.Activate(); } catch { }
+                try {
+                    this.IsEnabled = true;
+                    this.Show();
+                    this.Activate();
+                    _hideScheduled = false;
+                }
+                catch { }
 
                 // ★作成後も必ず捨てる
                 InvalidateQuizIndex();

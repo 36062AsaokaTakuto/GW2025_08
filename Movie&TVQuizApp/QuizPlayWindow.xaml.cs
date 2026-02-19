@@ -103,6 +103,36 @@ namespace Movie_AnimeQuizApp.Views {
             }
         }
 
+        // =====================================================
+        // ★追加：画面遷移時に「一瞬デスクトップが見える」を防ぐ（Closeを次フレームへ）
+        // =====================================================
+        private bool _closeScheduled = false;
+
+        private void ScheduleCloseAfterShow(Window nextWindow) {
+            if (_closeScheduled) return;
+            _closeScheduled = true;
+
+            try {
+                if (nextWindow != null) {
+                    if (!nextWindow.IsVisible) {
+                        nextWindow.Show();
+                    }
+                    try {
+                        if (nextWindow.WindowState == WindowState.Minimized) {
+                            nextWindow.WindowState = WindowState.Maximized;
+                        }
+                    }
+                    catch { }
+                    try { nextWindow.Activate(); } catch { }
+                }
+            }
+            catch { }
+
+            Dispatcher.BeginInvoke(new Action(() => {
+                try { Close(); } catch { }
+            }), DispatcherPriority.Render);
+        }
+
         public QuizPlayWindow(QuizSession session) {
             InitializeComponent();
 
@@ -376,18 +406,22 @@ namespace Movie_AnimeQuizApp.Views {
         }
 
         private void OpenResultWindow(bool isCorrect, int quizId) {
+            Window win = null;
+
             try {
-                var win = new QuizResultWindow(_workKey, quizId, isCorrect);
+                win = new QuizResultWindow(_workKey, quizId, isCorrect);
 
                 // Ownerはホームを引き継ぐ
                 win.Owner = this.Owner;
                 win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
                 win.Show();
+                try { win.Activate(); } catch { }
             }
             catch { }
 
-            Close();
+            // ★ここで即Closeしない（次フレームで閉じてチラ見え防止）
+            ScheduleCloseAfterShow(win);
         }
 
         // 戻る：検索文字をクリアして、呼び出し元へ戻る
@@ -400,9 +434,11 @@ namespace Movie_AnimeQuizApp.Views {
 
             ClearQuizSearchText();
 
+            Window back = null;
+
             try {
                 // 基本は Owner（呼び出し元）
-                var back = this.Owner;
+                back = this.Owner;
 
                 // Owner が無い/死んでる場合の保険：MainWindow を探す
                 if (back == null && Application.Current != null) {
@@ -420,7 +456,8 @@ namespace Movie_AnimeQuizApp.Views {
             }
             catch { }
 
-            Close();
+            // ★即Closeしない（次フレームで閉じる）
+            ScheduleCloseAfterShow(back);
         }
 
         private void ClearQuizSearchText() {
@@ -471,9 +508,11 @@ namespace Movie_AnimeQuizApp.Views {
             StopTimer();
             try { _imageCts?.Cancel(); } catch { }
 
+            Window back = null;
+
             try {
                 // 基本は Owner（呼び出し元）
-                var back = this.Owner;
+                back = this.Owner;
 
                 // Owner が無い/死んでる場合の保険：MainWindow を探す
                 if (back == null && Application.Current != null) {
@@ -491,7 +530,8 @@ namespace Movie_AnimeQuizApp.Views {
             }
             catch { }
 
-            Close();
+            // ★即Closeしない（次フレームで閉じる）
+            ScheduleCloseAfterShow(back);
         }
 
         // ---- 背景画像 ----

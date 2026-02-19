@@ -19,6 +19,8 @@ using System.Windows.Media.Imaging;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.ComponentModel; // ★追加：CancelEventArgs
+using System.Windows.Threading; // ★追加：DispatcherPriority
 
 namespace Movie_AnimeQuizApp.Views {
     public partial class QuizCreateWindow : Window {
@@ -113,6 +115,11 @@ namespace Movie_AnimeQuizApp.Views {
             return list;
         }
 
+        // =====================================================
+        // ★追加：Close時にOwnerが出る前の「一瞬の隙間」を作らない
+        // =====================================================
+        private bool _closingGuard = false;
+
         public QuizCreateWindow() {
             InitializeComponent();
 
@@ -129,6 +136,41 @@ namespace Movie_AnimeQuizApp.Views {
 
             QuestionTextBox.GotFocus += Question_GotFocus;
             QuestionTextBox.LostFocus += Question_LostFocus;
+
+            // ★追加：閉じる時のデスクトップちら見え防止
+            Closing += QuizCreateWindow_Closing;
+        }
+
+        private void QuizCreateWindow_Closing(object sender, CancelEventArgs e) {
+            if (_closingGuard) return;
+
+            _closingGuard = true;
+
+            try {
+                if (Owner != null) {
+                    if (!Owner.IsVisible) {
+                        Owner.Show();
+                    }
+                    try {
+                        if (Owner.WindowState == WindowState.Minimized) {
+                            Owner.WindowState = WindowState.Maximized;
+                        }
+                    }
+                    catch { }
+                    try { Owner.Activate(); } catch { }
+                }
+            }
+            catch { }
+
+            e.Cancel = true;
+
+            Dispatcher.BeginInvoke(new Action(() => {
+                try {
+                    Closing -= QuizCreateWindow_Closing;
+                    try { Close(); } catch { }
+                }
+                catch { }
+            }), DispatcherPriority.Render);
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e) {

@@ -215,6 +215,31 @@ namespace Movie_AnimeQuizApp {
             await ReloadBackgroundAsync();
         }
 
+        // =========================================================
+        // ★デスクトップちらつき対策：
+        //   次のWindowが描画されてから自分をHideする
+        // =========================================================
+        private void ShowOwnedWindowHideSelfAfterRendered(Window next) {
+            if (next == null) return;
+
+            next.Owner = this;
+            next.WindowState = WindowState.Maximized;
+
+            next.ContentRendered += (_, __) => {
+                try {
+                    if (this.IsVisible) this.Hide();
+                }
+                catch { }
+            };
+
+            next.Closed += (_, __) => {
+                try { this.Show(); this.Activate(); } catch { }
+            };
+
+            next.Show();
+            try { next.Activate(); } catch { }
+        }
+
         private void ClearQuizSearchTextForNavigation() {
             try { CancelQuizSuggestRequests(); } catch { }
 
@@ -290,15 +315,8 @@ namespace Movie_AnimeQuizApp {
             ClearQuizSearchTextForNavigation();
             ClearMainSearchTextForNavigation();
 
-            quizWin.Owner = this;
-
-            this.Hide();
-            quizWin.Closed += (_, __) => {
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            quizWin.WindowState = WindowState.Maximized;
-            quizWin.Show();
+            // ★ここだけ変更：先に表示→描画後にHide
+            ShowOwnedWindowHideSelfAfterRendered(quizWin);
         }
 
         private Window CreateQuizPlayWindowWindow(string workKey, int quizId) {
@@ -351,15 +369,8 @@ namespace Movie_AnimeQuizApp {
             ClearQuizSearchTextForNavigation();
             ClearMainSearchTextForNavigation();
 
-            quizWin.Owner = this;
-
-            this.Hide();
-            quizWin.Closed += (_, __) => {
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            quizWin.WindowState = WindowState.Maximized;
-            quizWin.Show();
+            // ★ここだけ変更：先に表示→描画後にHide
+            ShowOwnedWindowHideSelfAfterRendered(quizWin);
         }
 
         private void CancelQuizSuggestRequests() {
@@ -1150,15 +1161,9 @@ namespace Movie_AnimeQuizApp {
             ClearMainSearchTextForNavigation();
 
             var win = new SearchResultWindow(q, ApiKey);
-            win.Owner = this;
 
-            this.Hide();
-            win.Closed += (_, __) => {
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            win.WindowState = WindowState.Maximized;
-            win.Show();
+            // ★ここだけ変更：先に表示→描画後にHide
+            ShowOwnedWindowHideSelfAfterRendered(win);
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e) {
@@ -1326,15 +1331,9 @@ namespace Movie_AnimeQuizApp {
             ClearMainSearchTextForNavigation();
 
             var win = new SearchResultWindow(si.Id, si.MediaType, ApiKey);
-            win.Owner = this;
 
-            this.Hide();
-            win.Closed += (_, __) => {
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            win.WindowState = WindowState.Maximized;
-            win.Show();
+            // ★ここだけ変更：先に表示→描画後にHide
+            ShowOwnedWindowHideSelfAfterRendered(win);
         }
 
         private void ShowSuggest() {
@@ -1492,7 +1491,11 @@ namespace Movie_AnimeQuizApp {
             var w = new Movie_AnimeQuizApp.Views.QuizCreateWindow();
             w.Owner = this;
 
-            this.Hide();
+            // ★ここだけ変更：ダイアログが描画されてからHide（デスクトップちらつき防止）
+            w.ContentRendered += (_, __) => {
+                try { if (this.IsVisible) this.Hide(); } catch { }
+            };
+
             try {
                 w.WindowState = WindowState.Maximized;
                 w.ShowDialog();
@@ -1533,15 +1536,9 @@ namespace Movie_AnimeQuizApp {
             ClearMainSearchTextForNavigation();
 
             var win = new MediaBrowser(mode);
-            win.Owner = this;
 
-            this.Hide();
-            win.Closed += (_, __) => {
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            win.WindowState = WindowState.Maximized;
-            win.Show();
+            // ★ここだけ変更：先に表示→描画後にHide
+            ShowOwnedWindowHideSelfAfterRendered(win);
         }
 
         // ===== 背景タイル（変更なし） =====

@@ -60,6 +60,142 @@ namespace Movie_AnimeQuizApp {
         private ScrollViewer _suggestScrollViewer = null;
         private string _lastSuggestQueryText = null;
 
+        // ===== ★遷移時にデスクトップが見える対策（黒カバー） =====
+        private Window _transitionCover = null;
+
+        private void ShowTransitionCover() {
+            try {
+                if (_transitionCover != null) return;
+
+                var cover = new Window {
+                    WindowStyle = WindowStyle.None,
+                    ResizeMode = ResizeMode.NoResize,
+                    ShowInTaskbar = false,
+                    Topmost = true,
+                    Background = Brushes.Black,
+                    WindowStartupLocation = WindowStartupLocation.Manual,
+                    Left = SystemParameters.VirtualScreenLeft,
+                    Top = SystemParameters.VirtualScreenTop,
+                    Width = SystemParameters.VirtualScreenWidth,
+                    Height = SystemParameters.VirtualScreenHeight,
+                    ShowActivated = false
+                };
+
+                // ★重要：Ownerを「非表示のMainWindow」に付けると、Owner非表示の影響でカバー自体が表示されず
+                //        デスクトップちら見えが起きる。→ 基本はOwner無し（確実に最前面で覆う）。
+                // （必要なら表示中のWindowにOwnerを付けるが、非表示なら付けない）
+                try {
+                    var mw = Application.Current != null ? Application.Current.MainWindow : null;
+                    if (mw != null && mw != this && mw.IsVisible) {
+                        cover.Owner = mw;
+                    }
+                }
+                catch { }
+
+                _transitionCover = cover;
+                cover.Show();
+            }
+            catch {
+                _transitionCover = null;
+            }
+        }
+
+        private void CloseTransitionCover() {
+            try {
+                if (_transitionCover == null) return;
+                try { _transitionCover.Close(); } catch { }
+                _transitionCover = null;
+            }
+            catch {
+                _transitionCover = null;
+            }
+        }
+
+        private void ShowOwnedWindow_NoDesktopFlicker(Window child, bool hideThisWindow) {
+            if (child == null) return;
+
+            ShowTransitionCover();
+
+            bool coverClosed = false;
+            void CloseCoverOnce() {
+                if (coverClosed) return;
+                coverClosed = true;
+                CloseTransitionCover();
+            }
+
+            bool hidden = false;
+            void HideSelfOnce() {
+                if (!hideThisWindow) return;
+                if (hidden) return;
+                hidden = true;
+                try { this.Hide(); } catch { }
+            }
+
+            child.Owner = this;
+            child.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            // ★Activatedでカバーを閉じると「描画前」に閉じてしまう場合があり、ちら見え原因になる。
+            //   → ContentRendered（初回描画完了）で Hide→CoverClose の順に実行して隙間を作らない。
+            child.ContentRendered += (_, __) => {
+                HideSelfOnce();
+                CloseCoverOnce();
+            };
+
+            child.Closed += (_, __) => {
+                CloseCoverOnce();
+                if (AppNav.ForceMain) return;
+                if (hideThisWindow) {
+                    try { this.Show(); this.Activate(); } catch { }
+                }
+            };
+
+            // ★保険：何らかの理由でContentRenderedが遅れても、表示が確認できたら閉じる
+            Dispatcher.BeginInvoke(new Action(() => {
+                try {
+                    if (child != null && child.IsVisible) {
+                        // 描画完了前でもカバーを閉じない（隙間防止）
+                        // ここは何もしない（ContentRenderedで確実に閉じる）
+                    }
+                }
+                catch { }
+            }), DispatcherPriority.Background);
+
+            try { child.WindowState = WindowState.Maximized; } catch { }
+            child.Show();
+        }
+
+        // ★モーダル（ShowDialog）でもカバーでちら見え防止
+        private void ShowOwnedDialog_NoDesktopFlicker(Window dialog) {
+            if (dialog == null) return;
+
+            ShowTransitionCover();
+
+            bool coverClosed = false;
+            void CloseCoverOnce() {
+                if (coverClosed) return;
+                coverClosed = true;
+                CloseTransitionCover();
+            }
+
+            dialog.Owner = this;
+            dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            dialog.ContentRendered += (_, __) => CloseCoverOnce();
+            dialog.Closed += (_, __) => CloseCoverOnce();
+
+            try {
+                dialog.ShowDialog();
+            }
+            finally {
+                CloseCoverOnce();
+            }
+        }
+
+        protected override void OnClosed(EventArgs e) {
+            CloseTransitionCover();
+            base.OnClosed(e);
+        }
+
         public SearchResultWindow(string query, string apiKey) {
             InitializeComponent();
 
@@ -117,7 +253,17 @@ namespace Movie_AnimeQuizApp {
         // Home中に“前の詳細ページが復活”したら即消す
         private void SearchResultWindow_Activated(object sender, EventArgs e) {
             if (AppNav.ForceMain) {
+                // ★閉じる瞬間に下が見える対策
+                ShowTransitionCover();
                 try { Close(); } catch { try { Hide(); } catch { } }
+                // ★保険でIdleで閉じる
+                try {
+                    var disp = (Application.Current != null) ? Application.Current.Dispatcher : null;
+                    if (disp != null) {
+                        disp.BeginInvoke(new Action(() => CloseTransitionCover()), DispatcherPriority.ApplicationIdle);
+                    }
+                }
+                catch { CloseTransitionCover(); }
             }
         }
 
@@ -482,18 +628,10 @@ namespace Movie_AnimeQuizApp {
                 if (QuizMenu != null) QuizMenu.Visibility = Visibility.Collapsed;
 
                 var win = new Movie_AnimeQuizApp.Views.QuizPlayWindow(wk, firstQuizId);
-                win.Owner = this;
-                win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
                 win.WindowState = WindowState.Maximized;
 
-                this.Hide();
-                win.Closed += (_, __) => {
-                    if (AppNav.ForceMain) return;
-                    try { this.Show(); this.Activate(); } catch { }
-                };
-
-                win.Show();
-                win.WindowState = WindowState.Maximized;
+                // ★デスクトップちら見え防止（子表示→親Hide）
+                ShowOwnedWindow_NoDesktopFlicker(win, hideThisWindow: true);
             }
             catch {
                 // 何もしない
@@ -1141,17 +1279,8 @@ namespace Movie_AnimeQuizApp {
                 return;
             }
 
-            w.Owner = this;
-            w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-            this.Hide();
-            w.Closed += (_, __) => {
-                if (AppNav.ForceMain) return;
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            w.WindowState = WindowState.Maximized;
-            w.Show();
+            // ★デスクトップちら見え防止（子表示→親Hide）
+            ShowOwnedWindow_NoDesktopFlicker(w, hideThisWindow: true);
         }
 
         private Window CreateWindowByTypeNames(string[] fullNames) {
@@ -1183,15 +1312,10 @@ namespace Movie_AnimeQuizApp {
             HideMenus();
 
             var win = new MediaBrowser(mode);
-            win.Owner = this;
+            win.WindowState = WindowState.Maximized;
 
-            this.Hide();
-            win.Closed += (_, __) => {
-                if (AppNav.ForceMain) return;
-                try { this.Show(); this.Activate(); } catch { }
-            };
-
-            win.Show();
+            // ★デスクトップちら見え防止（子表示→親Hide）
+            ShowOwnedWindow_NoDesktopFlicker(win, hideThisWindow: true);
         }
 
         // =========================
@@ -1199,7 +1323,25 @@ namespace Movie_AnimeQuizApp {
         // =========================
         private void Home_Click(object sender, RoutedEventArgs e) {
             ClearQuizSearchText();
-            AppNav.GoHome(this);
+
+            // ★デスクトップちら見え防止（Home遷移はAppNav内でClose/Hideが走るのでカバーを先に出す）
+            ShowTransitionCover();
+
+            try {
+                AppNav.GoHome(this);
+            }
+            finally {
+                // ★Idleでカバーを閉じる（AppNav側で表示が落ち着いた後）
+                try {
+                    var disp = (Application.Current != null) ? Application.Current.Dispatcher : null;
+                    if (disp != null) {
+                        disp.BeginInvoke(new Action(() => CloseTransitionCover()), DispatcherPriority.ApplicationIdle);
+                    } else {
+                        CloseTransitionCover();
+                    }
+                }
+                catch { CloseTransitionCover(); }
+            }
         }
 
         // =========================
@@ -1207,7 +1349,21 @@ namespace Movie_AnimeQuizApp {
         // =========================
         private void BackButton_Click(object sender, RoutedEventArgs e) {
             ClearQuizSearchText();
-            Close();
+
+            // ★閉じる瞬間に下が見える対策：Ownerを先に出してから閉じる
+            ShowTransitionCover();
+
+            try {
+                if (this.Owner != null) {
+                    try { this.Owner.Show(); this.Owner.Activate(); } catch { }
+                }
+            }
+            catch { }
+
+            Dispatcher.BeginInvoke(new Action(() => {
+                try { Close(); } catch { try { Hide(); } catch { } }
+                CloseTransitionCover();
+            }), DispatcherPriority.Background);
         }
 
         // =========================
@@ -1992,11 +2148,9 @@ namespace Movie_AnimeQuizApp {
                 return;
             }
 
-            w.Owner = this;
-            w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-            // ★この画面は消さない
-            w.ShowDialog();
+            // ★この画面は消さない（モーダル表示）
+            // ★ただし表示開始時のちら見えだけはカバーで潰す
+            ShowOwnedDialog_NoDesktopFlicker(w);
         }
     }
 }
