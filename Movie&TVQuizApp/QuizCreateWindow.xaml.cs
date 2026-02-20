@@ -452,7 +452,7 @@ namespace Movie_AnimeQuizApp.Views {
 
         private async void ApplyWorkToUI(Work w) {
             if (w == null) {
-                try { WorkTitleText.Text = "未選択"; } catch { }
+                try { WorkTitleText.Text = "タイトル(未選択)"; } catch { }
                 try { BackdropImage.Source = null; } catch { }
                 return;
             }
