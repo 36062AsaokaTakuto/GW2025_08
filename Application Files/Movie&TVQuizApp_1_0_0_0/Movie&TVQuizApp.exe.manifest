@@ -1,0 +1,249 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<asmv1:assembly xsi:schemaLocation="urn:schemas-microsoft-com:asm.v1 assembly.adaptive.xsd" manifestVersion="1.0" xmlns:asmv1="urn:schemas-microsoft-com:asm.v1" xmlns="urn:schemas-microsoft-com:asm.v2" xmlns:asmv2="urn:schemas-microsoft-com:asm.v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:co.v1="urn:schemas-microsoft-com:clickonce.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" xmlns:dsig="http://www.w3.org/2000/09/xmldsig#" xmlns:co.v2="urn:schemas-microsoft-com:clickonce.v2">
+  <asmv1:assemblyIdentity name="Movie&amp;TVQuizApp.exe" version="1.0.0.0" publicKeyToken="7b68e5963e83d775" language="neutral" processorArchitecture="amd64" type="win32" />
+  <description asmv2:iconFile="AppIcon.ico" xmlns="urn:schemas-microsoft-com:asm.v1" />
+  <application />
+  <entryPoint>
+    <assemblyIdentity name="Movie&amp;TVQuizApp" version="1.0.0.0" language="neutral" processorArchitecture="amd64" />
+    <commandLine file="Movie&amp;TVQuizApp.exe" parameters="" />
+  </entryPoint>
+  <trustInfo>
+    <security>
+      <applicationRequestMinimum>
+        <PermissionSet Unrestricted="true" ID="Custom" SameSite="site" />
+        <defaultAssemblyRequest permissionSetReference="Custom" />
+      </applicationRequestMinimum>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <!--
+          UAC マニフェスト オプション
+          Windows のユーザー アカウント制御のレベルを変更するには、
+          requestedExecutionLevel ノードを以下のいずれかで置換します。
+
+        <requestedExecutionLevel  level="asInvoker" uiAccess="false" />
+        <requestedExecutionLevel  level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel  level="highestAvailable" uiAccess="false" />
+
+         下位互換性を保つためにファイルおよびレジストリの仮想化を使用する場合、
+         requestedExecutionLevel ノードを削除します。
+    -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <dependency>
+    <dependentOS>
+      <osVersionInfo>
+        <os majorVersion="5" minorVersion="1" buildNumber="2600" servicePackMajor="0" />
+      </osVersionInfo>
+    </dependentOS>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="preRequisite" allowDelayedBinding="true">
+      <assemblyIdentity name="Microsoft.Windows.CommonLanguageRuntime" version="4.0.30319.0" />
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Microsoft.Web.WebView2.Core.dll" size="649800">
+      <assemblyIdentity name="Microsoft.Web.WebView2.Core" version="1.0.3650.58" publicKeyToken="2A8AB48044D2601E" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>K5mdF3UATpizLygfRRjzlS32UJcHSFJ+9bVPqZedbJw=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Microsoft.Web.WebView2.WinForms.dll" size="38984">
+      <assemblyIdentity name="Microsoft.Web.WebView2.WinForms" version="1.0.3650.58" publicKeyToken="2A8AB48044D2601E" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>u8UFdbahkf1DPfhUInkhk38lbpGoG0fGl9leqO0Cf/Y=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Microsoft.Web.WebView2.Wpf.dll" size="82536">
+      <assemblyIdentity name="Microsoft.Web.WebView2.Wpf" version="1.0.3650.58" publicKeyToken="2A8AB48044D2601E" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>bTKRYrRgUVqEnGk1GP9iahozY+edVJz9aCLlYB8kYD4=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Movie&amp;TVQuizApp.exe" size="610736">
+      <assemblyIdentity name="Movie&amp;TVQuizApp" version="1.0.0.0" language="neutral" processorArchitecture="amd64" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>bjDZxRvn1+Nimc3wSqJ5MWWsF4IV6u94G2fEf2WO9kM=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Newtonsoft.Json.dll" size="721320">
+      <assemblyIdentity name="Newtonsoft.Json" version="13.0.0.0" publicKeyToken="30AD4FE6B2A6AEED" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>8MB68OhNTdTaS9eCO6RTW8BIGzv2I+1Atlm2gUemu3U=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="SQLite-net.dll" size="107520">
+      <assemblyIdentity name="SQLite-net" version="1.9.172.0" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>/0h0FMSssyqe6OCqk97walP3tX35PS56JgVOGN+Fcj4=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="SQLitePCLRaw.batteries_v2.dll" size="11776">
+      <assemblyIdentity name="SQLitePCLRaw.batteries_v2" version="2.1.11.2622" publicKeyToken="8226EA5DF37BCAE9" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>/Z93rPOmHP+2CimDNoxyyRCjUOLtixxr79gghDoHO80=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="SQLitePCLRaw.core.dll" size="51200">
+      <assemblyIdentity name="SQLitePCLRaw.core" version="3.0.2.2801" publicKeyToken="1488E028CA7AB535" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>Ymt5AoCdbUp1CNkshM7PpEd2Hz6ZLnCP/5fwc45TBhU=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="SQLitePCLRaw.provider.dynamic_cdecl.dll" size="68096">
+      <assemblyIdentity name="SQLitePCLRaw.provider.dynamic_cdecl" version="3.0.2.2801" publicKeyToken="B68184102CBA0B3B" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>UfoAR7FO80fIhB3qE938p7iQmcjqOAwup3R58laNem0=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="SQLitePCLRaw.provider.e_sqlite3.dll" size="40960">
+      <assemblyIdentity name="SQLitePCLRaw.provider.e_sqlite3" version="3.0.2.2801" publicKeyToken="9C301DB686D0BD12" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>4bNv2ZO+dX1ghJK8t5gzgeBK9gIqHzJ7cf/BU/EPM48=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="System.Buffers.dll" size="23816">
+      <assemblyIdentity name="System.Buffers" version="4.0.5.0" publicKeyToken="CC7B13FFCD2DDD51" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>LXjXcMnLmXGZFUrowBi58dHvvIZyn3Jk3ebbrSoSysM=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="System.Memory.dll" size="145200">
+      <assemblyIdentity name="System.Memory" version="4.0.5.0" publicKeyToken="CC7B13FFCD2DDD51" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>1ejkhm+c+mb3dlZg+EshAZiJPlUzVIev5evaNCwOkT0=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="System.Numerics.Vectors.dll" size="110344">
+      <assemblyIdentity name="System.Numerics.Vectors" version="4.1.6.0" publicKeyToken="B03F5F7F11D50A3A" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>IML6gbjHDWUQmddilU8oX9T5QuY7LXIXwUXauNSy9Mk=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="System.Runtime.CompilerServices.Unsafe.dll" size="19256">
+      <assemblyIdentity name="System.Runtime.CompilerServices.Unsafe" version="6.0.3.0" publicKeyToken="B03F5F7F11D50A3A" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>CMvXJ4tm8eaEJagtS5cYGkEw2T492RgxQHq6chLM2s8=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <file name="AppIcon.ico" size="123358">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>oZnImob8kh7f7iKFIsvYzHkHb/daLqPxlmg+kUHmHnA=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="e_sqlite3.dll" size="1911296">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>qr+F16i0FvsVIDy3VPz8mFjI8d07vH6rgjNfbDYroNY=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="Movie&amp;TVQuizApp.exe.config" size="1309">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>jRnvguidzds7AJTWVYBMLa6EqQr3DXo2Zw8+a9yabQU=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="runtimes\win-x64\native\WebView2Loader.dll" size="160320">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>hCex/FjscHgT5cClHrXWk5e7MzJQp7iRvk07Ej8eDxw=</dsig:DigestValue>
+    </hash>
+  </file>
+<publisherIdentity name="CN=C4204\infosys" issuerKeyHash="25106bf915e51c3e73816844e6ab60d637b9391e" /><Signature Id="StrongNameSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>/tapAqmj3HaR+I3ZbUCIQSrcbHqxrgNoXKxxREe9io8=</DigestValue></Reference></SignedInfo><SignatureValue>ll2zIOOXvYcKG/hEeFSylDm7EYkGPVaAlXzzjpvPqar9/ehMo0HgxMX/xHKhmdSBmKSZfj/Mr8ewy3OoJsl9AC8RkjlY5vJkNYQEB9Azowkj5Bw8HHRaibK6s5cxacjncZvkNF4nUWETn/sLiqMlLHYN4mjoy9lR0xDABO8LndQ=</SignatureValue><KeyInfo Id="StrongNameKeyInfo"><KeyValue><RSAKeyValue><Modulus>ybdmFHnyJEUHqEybTuHFfoyDwflJcH0wZ7L0gr2ytDCIlPv708fPSe+BskmrQ1IsaKXseIRrDRBh0WHUJhfQbC+pEJmkq29FpqhYaUKIZhOWpxaS0F7XiuHECm4Jqj/VgWOLxzqcryg+fXGlk8XfkCgiWxXzVk2UZ3Yf2yUwHKU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><msrel:RelData xmlns:msrel="http://schemas.microsoft.com/windows/rel/2005/reldata"><r:license xmlns:r="urn:mpeg:mpeg21:2003:01-REL-R-NS" xmlns:as="http://schemas.microsoft.com/windows/pki/2005/Authenticode"><r:grant><as:ManifestInformation Hash="8f8abd474471ac5c6803aeb17a6cdc2a4188406dd98df89176dca3a902a9d6fe" Description="" Url=""><as:assemblyIdentity name="Movie&amp;TVQuizApp.exe" version="1.0.0.0" publicKeyToken="7b68e5963e83d775" language="neutral" processorArchitecture="amd64" type="win32" /></as:ManifestInformation><as:SignedBy /><as:AuthenticodePublisher><as:X509SubjectName>CN=C4204\infosys</as:X509SubjectName></as:AuthenticodePublisher></r:grant><r:issuer><Signature Id="AuthenticodeSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>AnvRKjRS5DfpO9q9gnRhCWWV3aE7GX7xlYrbQ5rgRjs=</DigestValue></Reference></SignedInfo><SignatureValue>T7X/yxCbdaPfdkTmnfXklb/xseCC211XT8mJG3Mvn+cEm6ydt5zH3Fg+ULk6Eq2kbor/ELbkFJ9Opurhtr2/p5ooDfrW9G5ojr0eL/Wrvi8Kq75bgXrmgmc+9Y5FgKg5P3G+FWaziYfkPflAyMbFgimOTbcBtlA3kCMwMmgFszA=</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>ybdmFHnyJEUHqEybTuHFfoyDwflJcH0wZ7L0gr2ytDCIlPv708fPSe+BskmrQ1IsaKXseIRrDRBh0WHUJhfQbC+pEJmkq29FpqhYaUKIZhOWpxaS0F7XiuHECm4Jqj/VgWOLxzqcryg+fXGlk8XfkCgiWxXzVk2UZ3Yf2yUwHKU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>MIIBzTCCATagAwIBAgIQFAUs6WdAJ4RPbJvIvHRRWjANBgkqhkiG9w0BAQsFADAlMSMwIQYDVQQDHhoAQwA0ADIAMAA0AFwAaQBuAGYAbwBzAHkAczAeFw0yNjAyMjAwNDI3MzJaFw0yNzAyMjAxMDI3MzJaMCUxIzAhBgNVBAMeGgBDADQAMgAwADQAXABpAG4AZgBvAHMAeQBzMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDJt2YUefIkRQeoTJtO4cV+jIPB+UlwfTBnsvSCvbK0MIiU+/vTx89J74GySatDUixopex4hGsNEGHRYdQmF9BsL6kQmaSrb0WmqFhpQohmE5anFpLQXteK4cQKbgmqP9WBY4vHOpyvKD59caWTxd+QKCJbFfNWTZRndh/bJTAcpQIDAQABMA0GCSqGSIb3DQEBCwUAA4GBALfiOo6CpYxyeM6rXPxK+4Da13aJRx6XkC0qsy1rVnzE+OHRwyuKmXQQcnLf4uM3faau1/XSxrIZh7s4ip71TPl58dDCX4T6mZnYRRSR0IOtIQDGo+Lv76pMBBi+otvyzE3i6uYh9ugV+54/CAARF1NGCN1Qw4MYyHG02xAk/H+3</X509Certificate></X509Data></KeyInfo></Signature></r:issuer></r:license></msrel:RelData></KeyInfo></Signature></asmv1:assembly>

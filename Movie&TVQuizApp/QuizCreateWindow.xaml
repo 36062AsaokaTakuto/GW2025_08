@@ -9,6 +9,7 @@
         Loaded="Window_Loaded"
         WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize"
         WindowState="Maximized">
+    
 
     <Window.Resources>
 
